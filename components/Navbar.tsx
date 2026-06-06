@@ -2,12 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { supabase } from '@/lib/supabaseClient';
 import Link from 'next/link';
 
 export default function Navbar() {
   const { profile, loading, signOut } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  
+  // Notifications state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notiDropdownOpen, setNotiDropdownOpen] = useState(false);
 
   // Initialize theme from localStorage on load
   useEffect(() => {
@@ -19,6 +24,84 @@ export default function Navbar() {
       document.documentElement.classList.remove('dark');
     }
   }, []);
+
+  // Fetch unread notifications
+  const fetchNotifications = async () => {
+    if (!profile) return;
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('[Notifications] Lỗi khi nạp thông báo:', err);
+    }
+  };
+
+  // Subscribe to realtime notifications
+  useEffect(() => {
+    if (!profile) return;
+
+    fetchNotifications();
+
+    const channel = supabase
+      .channel(`notifications:${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT (new notification) and UPDATE (marked as read)
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotifications((prev) => [payload.new, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedNoti = payload.new;
+            if (updatedNoti.is_read) {
+              setNotifications((prev) => prev.filter((n) => n.id !== updatedNoti.id));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile]);
+
+  // Request browser notification permissions on mount if not already granted
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Handle notification click: mark as read and open chat conversation
+  const handleNotificationClick = async (noti: any) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', noti.id);
+
+      if (error) throw error;
+      setNotifications((prev) => prev.filter((n) => n.id !== noti.id));
+
+      if (noti.conversation_id) {
+        window.location.href = `/?chat=${noti.conversation_id}`;
+      }
+    } catch (err) {
+      console.error('[Notifications] Lỗi xử lý click thông báo:', err);
+    }
+  };
 
   // Toggle Dark/Light mode
   const toggleTheme = () => {
@@ -88,6 +171,60 @@ export default function Navbar() {
                 <span className="text-xs sm:text-sm font-black text-emerald-500 tracking-wide">
                   {(profile.credits ?? 0).toLocaleString('vi-VN')}₫
                 </span>
+              </div>
+
+              {/* Notification Bell Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setNotiDropdownOpen(!notiDropdownOpen)}
+                  className="relative p-2.5 rounded-xl border border-border-color bg-card-bg text-foreground hover:bg-border-color transition-colors shadow-sm cursor-pointer focus:outline-none"
+                  aria-label="Notifications"
+                >
+                  🔔
+                  {notifications.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[9px] text-white font-black animate-pulse shadow-md">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown Menu */}
+                {notiDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setNotiDropdownOpen(false)} />
+                    <div className="absolute right-0 mt-2.5 w-72 z-20 rounded-2xl border border-border-color bg-white dark:bg-slate-900 p-2 shadow-2xl animate-fade-in max-h-96 overflow-y-auto">
+                      <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800">
+                        <span className="block text-xs font-black text-slate-900 dark:text-slate-100">
+                          Thông báo tin nhắn ({notifications.length})
+                        </span>
+                      </div>
+                      
+                      {notifications.length === 0 ? (
+                        <div className="py-8 px-4 text-center text-xs text-text-muted italic">
+                          Không có thông báo mới nào
+                        </div>
+                      ) : (
+                        notifications.map((noti) => (
+                          <button
+                            key={noti.id}
+                            onClick={() => {
+                              setNotiDropdownOpen(false);
+                              handleNotificationClick(noti);
+                            }}
+                            className="w-full flex flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-xs text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mt-1 border border-transparent cursor-pointer"
+                          >
+                            <span className="font-bold text-slate-850 dark:text-slate-100 block truncate w-full">
+                              📩 {noti.content}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-bold block">
+                              {new Date(noti.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Profile Avatar Dropdown */}

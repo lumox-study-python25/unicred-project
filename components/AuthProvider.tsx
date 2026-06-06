@@ -54,17 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('users')
         .select('*')
         .eq('id', uid)
-        .maybeSingle();
+        .single();
       
-      if (error) {
-        console.error('[Auth Error] Lỗi khi truy vấn hồ sơ từ bảng public.users:', error);
-        throw error;
-      }
-      
-      if (!data) {
-        console.warn(`[Auth] Không tìm thấy hồ sơ cho UID ${uid} trong bảng public.users. Đang tiến hành tự động khởi tạo...`);
-        
-        // Retrieve current authenticated user session details to fallback
+      if (error || !data) {
+        console.log("Profile not found, creating automatically");
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         const userEmail = currentUser?.email || '';
         
@@ -91,17 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('users')
           .insert([fallbackProfile])
           .select()
-          .maybeSingle();
+          .single();
 
         if (insertError) {
           console.error('[Auth Error] Tự động tạo hồ sơ thất bại:', insertError);
-          // Set local fallback state so UI doesn't hang
           setProfile(fallbackProfile as UserProfile);
-        } else if (newProfile) {
-          console.log('[Auth] Hồ sơ tự động khởi tạo thành công:', newProfile);
-          setProfile(newProfile as UserProfile);
         } else {
-          setProfile(fallbackProfile as UserProfile);
+          setProfile(newProfile as UserProfile);
         }
       } else {
         console.log('[Auth] Tải hồ sơ người dùng thành công:', data);
@@ -109,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('[Auth Exception] Lỗi ngoại lệ trong fetchProfile:', err);
-      // Fail-safe default profile so UI never gets stuck in infinite loading spinner
+      // NEVER block UI waiting for profile, always set loading = false even on error
       setProfile({
         id: uid,
         email: '',
@@ -137,37 +126,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    // 1. Check active session on load with robust error handling for invalid refresh tokens
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        console.error('[Auth Error] Lỗi kiểm tra phiên đăng nhập (có thể do Token Refresh hết hạn):', JSON.stringify(error, null, 2));
-        try {
-          await supabase.auth.signOut();
-        } catch (soErr) {
-          console.error('[Auth] Lỗi khi cố gắng signOut dọn dẹp token:', soErr);
-        }
+  const initUser = async () => {
+    try {
+      setLoading(true);
+      // 1. Check session first
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.log("No active session or session error, redirecting to login");
         setUser(null);
         setProfile(null);
-      } else {
-        const activeUser = session?.user ?? null;
-        setUser(activeUser);
-        if (activeUser) {
-          await fetchProfile(activeUser.id);
+        setLoading(false);
+        // Force redirect to login immediately if we are not on an auth route
+        const isAuthRoute = window.location.pathname === '/login' || window.location.pathname === '/signup';
+        if (!isAuthRoute) {
+          window.location.href = "/login";
         }
+        return;
       }
-      setLoading(false);
-    }).catch(async (err) => {
-      console.error('[Auth Exception] Lỗi ngoại lệ getSession:', JSON.stringify(err, null, 2));
-      try {
-        await supabase.auth.signOut();
-      } catch (soErr) {
-        console.error('[Auth] Lỗi khi cố gắng signOut dọn dẹp token:', soErr);
+
+      const activeUser = session.user;
+      setUser(activeUser);
+
+      // 2. Fetch profile from users table
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', activeUser.id)
+        .single();
+
+      if (error || !data) {
+        console.log("Profile not found, creating profile automatically");
+        const userEmail = activeUser.email || '';
+        
+        const fallbackProfile = {
+          id: activeUser.id,
+          email: userEmail,
+          name: userEmail ? userEmail.split('@')[0] : 'Sinh Viên',
+          university: 'Đại học Bách Khoa Hà Nội (HUST)',
+          major: 'Chưa cập nhật',
+          credits: 500000,
+          reputation: 100,
+          is_verified: false,
+          avatar_url: null,
+          bio: null,
+          student_card_url: null,
+          facebook_url: null,
+          instagram_url: null,
+          role: 'user' as const,
+          is_banned: false,
+          flagged_reason: null,
+        };
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from('users')
+          .insert([fallbackProfile])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('[Auth Error] Tự động tạo hồ sơ thất bại:', insertError);
+          setProfile(fallbackProfile as UserProfile);
+        } else {
+          setProfile(newProfile as UserProfile);
+        }
+      } else {
+        setProfile(data as UserProfile);
       }
-      setUser(null);
-      setProfile(null);
+    } catch (err) {
+      console.error('[Auth Exception] Lỗi trong initUser:', err);
+    } finally {
       setLoading(false);
-    });
+    }
+  };
+
+  useEffect(() => {
+    initUser();
 
     // 2. Listen to active auth events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -185,14 +219,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN') {
         router.push('/');
       } else if (event === 'SIGNED_OUT') {
-        router.push('/login');
+        // Handled by signOut redirect
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, []);
 
   // 3. Client-side Route protections
   useEffect(() => {
@@ -208,12 +242,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      setLoading(true);
       await supabase.auth.signOut();
-      router.push('/login');
+      localStorage.clear();
+      setUser(null);
+      setProfile(null);
+      window.location.href = "/login";
     } catch (err) {
       console.error('Error during signOut:', err);
+      localStorage.clear();
+      window.location.href = "/login";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm font-semibold text-text-muted animate-pulse">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>

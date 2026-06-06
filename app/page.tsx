@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import CreateJobForm from '@/components/CreateJobForm';
 import JobCard, { Job, Application, Contract } from '@/components/JobCard';
 import ReviewModal from '@/components/ReviewModal';
+import ChatDrawer from '@/components/ChatDrawer';
 
 interface ToastState {
   message: string;
@@ -44,6 +45,18 @@ export default function Dashboard() {
   const [selectedJobId, setSelectedJobId] = useState('');
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
 
+  // Chat Drawer State
+  const [chatOpen, setChatOpen] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [chatJobTitle, setChatJobTitle] = useState('');
+  const [chatOtherPartyName, setChatOtherPartyName] = useState('');
+
+  // Ref to store jobs to prevent realtime dependency loop
+  const jobsRef = React.useRef<Job[]>([]);
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
   // Trigger Toast notifications
   const triggerToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     setToast({ message, type });
@@ -51,6 +64,94 @@ export default function Dashboard() {
       setToast(null);
     }, 4500);
   };
+
+  // Handler: Open/Create Chat conversation between job owner and applicant/worker
+  const handleOpenChat = async (jobId: string, workerId: string, otherName: string, jobTitle: string) => {
+    try {
+      setChatJobTitle(jobTitle);
+      setChatOtherPartyName(otherName);
+      setChatOpen(true);
+      setActiveConversationId(null);
+
+      // Check if conversation already exists for the job and worker
+      const { data: existingConvs, error: fetchError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('worker_id', workerId)
+        .limit(1);
+
+      if (fetchError) throw fetchError;
+
+      if (existingConvs && existingConvs.length > 0) {
+        setActiveConversationId(existingConvs[0].id);
+      } else {
+        // Insert new conversation
+        const { data: newConv, error: insertError } = await supabase
+          .from('conversations')
+          .insert([{ job_id: jobId, worker_id: workerId }])
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        if (newConv) {
+          setActiveConversationId(newConv.id);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Chat] Lỗi khi tạo/tải hội thoại:', err);
+      triggerToast('Không thể mở cuộc trò chuyện. Vui lòng thử lại.', 'error');
+      setChatOpen(false);
+    }
+  };
+
+  // Automatically open chat drawer if URL contains query parameter ?chat=conversation_id
+  useEffect(() => {
+    if (!profile) return;
+    
+    const handleUrlChat = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const chatIdParam = params.get('chat');
+      if (!chatIdParam) return;
+
+      try {
+        setChatOpen(true);
+        setActiveConversationId(chatIdParam);
+
+        // Fetch conversation details to populate drawer header info
+        const { data: convData, error: convError } = await supabase
+          .from('conversations')
+          .select('*, job:job_id(title, owner_id)')
+          .eq('id', chatIdParam)
+          .single();
+
+        if (convError || !convData) throw convError || new Error('Không tìm thấy cuộc hội thoại');
+
+        const job = convData.job as any;
+        setChatJobTitle(job?.title || 'Công việc');
+
+        // Identify other party name
+        const otherUserId = profile.id === convData.worker_id ? job?.owner_id : convData.worker_id;
+        const { data: userData } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', otherUserId)
+          .single();
+
+        setChatOtherPartyName(userData?.name || userData?.email?.split('@')[0] || 'Đối phương');
+
+        // Clear query parameter from address bar cleanly without page refresh
+        const url = new URL(window.location.href);
+        url.searchParams.delete('chat');
+        window.history.replaceState({}, '', url.pathname);
+      } catch (err) {
+        console.error('[Chat] Lỗi khi nạp hội thoại từ URL:', err);
+        setChatOpen(false);
+      }
+    };
+
+    handleUrlChat();
+  }, [profile]);
 
   // Fetch Jobs, Applications, and Active Contracts from Supabase
   const loadJobsAndRelations = async () => {
@@ -116,7 +217,7 @@ export default function Dashboard() {
         (payload) => {
           loadJobsAndRelations();
           // Notify if active user owns the job
-          const jobObj = jobs.find((j) => j.id === payload.new.job_id);
+          const jobObj = jobsRef.current.find((j) => j.id === payload.new.job_id);
           if (jobObj && jobObj.owner_id === profile.id) {
             triggerToast('📩 Có sinh viên vừa ứng tuyển vào công việc của bạn!', 'info');
           }
@@ -149,7 +250,7 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile, jobs]);
+  }, [profile]);
 
   // Handler: Apply to a job listing (Freelancer Action)
   const handleApplyToJob = async (jobId: string) => {
@@ -425,6 +526,7 @@ export default function Dashboard() {
                         onApply={handleApplyToJob}
                         onAcceptApplicant={handleAcceptApplicant}
                         onCompleteClick={handleCompleteClick}
+                        onOpenChat={handleOpenChat}
                       />
                     ))}
                   </div>
@@ -491,6 +593,7 @@ export default function Dashboard() {
                       onApply={handleApplyToJob}
                       onAcceptApplicant={handleAcceptApplicant}
                       onCompleteClick={handleCompleteClick}
+                      onOpenChat={handleOpenChat}
                     />
                   ))}
                 </div>
@@ -499,6 +602,17 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* 5. Chat Drawer Component */}
+      <ChatDrawer
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        conversationId={activeConversationId}
+        jobTitle={chatJobTitle}
+        otherPartyName={chatOtherPartyName}
+        activeUserId={profile.id}
+        activeUserName={profile.name || 'Sinh viên'}
+      />
     </div>
   );
 }

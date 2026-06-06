@@ -54,6 +54,7 @@ interface JobCardProps {
   onApply: (jobId: string) => Promise<void>;
   onAcceptApplicant: (jobId: string, workerId: string) => Promise<void>;
   onCompleteClick: (jobId: string, workerId: string) => void; // Opens rating modal
+  onOpenChat: (jobId: string, workerId: string, otherName: string, jobTitle: string) => void;
 }
 
 const CATEGORY_MAP: Record<string, string> = {
@@ -75,6 +76,7 @@ export default function JobCard({
   onApply,
   onAcceptApplicant,
   onCompleteClick,
+  onOpenChat,
 }: JobCardProps) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
@@ -222,7 +224,7 @@ export default function JobCard({
                           key={app.id}
                           className="flex items-center justify-between gap-3 bg-background border border-border-color rounded-xl p-2.5 shadow-sm"
                         >
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="block text-xs font-bold text-foreground truncate">
                               {app.user?.name || app.user?.email || 'Sinh Viên'}
                             </span>
@@ -234,17 +236,26 @@ export default function JobCard({
                             </span>
                           </div>
                           
-                          <button
-                            onClick={() => handleAccept(app.user_id)}
-                            disabled={loadingAction !== null}
-                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-[10px] font-bold text-white px-3 py-1.5 rounded-lg active:scale-95 transition-all cursor-pointer flex items-center gap-1"
-                          >
-                            {isHiringThisUser ? (
-                              <div className="h-3 w-3 animate-spin rounded-full border border-t-transparent border-white" />
-                            ) : (
-                              'Chọn'
-                            )}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => onOpenChat(job.id, app.user_id, app.user?.name || app.user?.email || 'Sinh Viên', job.title)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center border border-slate-200"
+                              title="Nhắn tin trò chuyện"
+                            >
+                              💬
+                            </button>
+                            <button
+                              onClick={() => handleAccept(app.user_id)}
+                              disabled={loadingAction !== null}
+                              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-[10px] font-bold text-white px-3 py-1.5 rounded-lg active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              {isHiringThisUser ? (
+                                <div className="h-3 w-3 animate-spin rounded-full border border-t-transparent border-white" />
+                              ) : (
+                                'Chọn'
+                              )}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -256,11 +267,19 @@ export default function JobCard({
             {/* 2. Job in progress: Show contract info & complete review button */}
             {job.status === 'in_progress' && (
               <div className="space-y-3">
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs">
-                  <span className="block text-[10px] uppercase text-text-muted font-bold mb-1">Người làm việc</span>
-                  <span className="font-bold text-foreground block truncate">
-                    👤 {contract?.worker?.name || contract?.worker?.email || 'Freelancer'}
-                  </span>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs flex justify-between items-center">
+                  <div className="min-w-0">
+                    <span className="block text-[10px] uppercase text-text-muted font-bold mb-1">Người làm việc</span>
+                    <span className="font-bold text-foreground block truncate">
+                      👤 {contract?.worker?.name || contract?.worker?.email || 'Freelancer'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onOpenChat(job.id, contract?.worker_id || '', contract?.worker?.name || contract?.worker?.email || 'Sinh Viên', job.title)}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                  >
+                    💬 Nhắn tin
+                  </button>
                 </div>
 
                 <button
@@ -294,15 +313,23 @@ export default function JobCard({
             {job.status === 'open' && (
               <>
                 {applied ? (
-                  <button
-                    disabled
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-2.5 text-sm font-bold text-indigo-600 dark:text-indigo-400 cursor-not-allowed"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Đã ứng tuyển thành công
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      disabled
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 cursor-not-allowed"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Đã ứng tuyển
+                    </button>
+                    <button
+                      onClick={() => onOpenChat(job.id, activeUserId, job.owner?.name || job.owner?.email || 'Nhà tuyển dụng', job.title)}
+                      className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                    >
+                      💬 Nhắn tin
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={handleApply}
@@ -328,9 +355,17 @@ export default function JobCard({
             {job.status === 'in_progress' && (
               <>
                 {contract?.worker_id === activeUserId ? (
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 justify-center">
-                    <span className="h-2 w-2 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
-                    Bạn đã được nhận! Hãy bắt đầu làm việc.
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 justify-center">
+                      <span className="h-2 w-2 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
+                      Bạn đã được nhận! Hãy bắt đầu làm việc.
+                    </div>
+                    <button
+                      onClick={() => onOpenChat(job.id, activeUserId, job.owner?.name || job.owner?.email || 'Nhà tuyển dụng', job.title)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-bold text-white transition-all cursor-pointer shadow-md"
+                    >
+                      💬 Nhắn tin trao đổi
+                    </button>
                   </div>
                 ) : (
                   <button
