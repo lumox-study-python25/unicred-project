@@ -128,7 +128,7 @@ export default function Dashboard() {
         // Fetch conversation details to populate drawer header info
         const { data: convData, error: convError } = await supabase
           .from('conversations')
-          .select('*, job:job_id(title, owner_id)')
+          .select('*, job:job_id(title, created_by)')
           .eq('id', chatIdParam)
           .single();
 
@@ -138,7 +138,7 @@ export default function Dashboard() {
         setChatJobTitle(job?.title || 'Công việc');
 
         // Identify other party name
-        const otherUserId = profile.id === convData.worker_id ? job?.owner_id : convData.worker_id;
+        const otherUserId = profile.id === convData.worker_id ? job?.created_by : convData.worker_id;
         const { data: userData } = await supabase
           .from('users')
           .select('name, email')
@@ -168,7 +168,7 @@ export default function Dashboard() {
       // Fetch all jobs, joining on owner information
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select('*, owner:owner_id(email, name, is_verified, client_reputation, freelancer_reputation, reputation)')
+        .select('*, owner:created_by(email, name, is_verified, credits)')
         .order('created_at', { ascending: false });
 
       if (jobsError) throw jobsError;
@@ -176,14 +176,14 @@ export default function Dashboard() {
       // Fetch all applications, joining on applicant details
       const { data: appsData, error: appsError } = await supabase
         .from('job_applications')
-        .select('*, user:user_id(email, name, reputation, freelancer_reputation, university)');
+        .select('*, user:user_id(email, name, credits, university)');
 
       if (appsError) throw appsError;
 
       // Fetch active contracts, joining on contractor details
       const { data: contractsData, error: contractsError } = await supabase
         .from('contracts')
-        .select('*, worker:worker_id(email, name, freelancer_reputation, reputation)');
+        .select('*, worker:worker_id(email, name, credits)');
 
       if (contractsError) throw contractsError;
 
@@ -241,7 +241,7 @@ export default function Dashboard() {
           loadJobsAndRelations();
           // Notify if active user owns the job
           const jobObj = jobsRef.current.find((j) => j.id === payload.new.job_id);
-          if (jobObj && jobObj.owner_id === profile.id) {
+          if (jobObj && jobObj.created_by === profile.id) {
             triggerToast('📩 Có sinh viên vừa ứng tuyển vào công việc của bạn!', 'info');
           }
         }
@@ -290,11 +290,6 @@ export default function Dashboard() {
   // Handler: Apply to a job listing (Freelancer Action)
   const handleApplyToJob = async (jobId: string) => {
     try {
-      // Check if freelancer has at least 30 credits to stake
-      if (profile!.credits < 30) {
-        throw new Error('Số dư không đủ! Bạn cần có ít nhất 30 credits để đặt cọc khi nhận việc.');
-      }
-
       const { error } = await supabase
         .from('job_applications')
         .insert([{ job_id: jobId, user_id: profile!.id }]);
@@ -317,7 +312,7 @@ export default function Dashboard() {
         .from('jobs')
         .update({ 
           status: 'in_progress', 
-          assigned_worker_id: workerId 
+          assigned_to: workerId 
         })
         .eq('id', jobId);
 
@@ -342,21 +337,14 @@ export default function Dashboard() {
   // Handler: Approve Completion from either Client or Worker
   const handleApproveCompletion = async (jobId: string, role: 'client' | 'worker') => {
     try {
-      const updateData: any = {};
-      if (role === 'client') {
-        updateData.client_approved = true;
-      } else {
-        updateData.worker_approved = true;
-      }
-
       const { error } = await supabase
         .from('jobs')
-        .update(updateData)
+        .update({ status: 'completed' })
         .eq('id', jobId);
 
       if (error) throw error;
 
-      triggerToast('Đã xác nhận hoàn thành công việc của bạn!', 'success');
+      triggerToast('Đã nghiệm thu và hoàn thành công việc thành công! Freelancer đã được cộng +10 credits.', 'success');
       loadJobsAndRelations();
       refreshProfile();
     } catch (err: any) {
@@ -449,10 +437,10 @@ export default function Dashboard() {
   }
 
   // Categories Filtering
-  const employerPostedJobs = jobs.filter((j) => j.owner_id === profile.id);
+  const employerPostedJobs = jobs.filter((j) => j.created_by === profile.id);
   const freelancerAvailableJobs = jobs.filter((j) => {
     // Hide own postings
-    if (j.owner_id === profile.id) return false;
+    if (j.created_by === profile.id) return false;
     // Category checks
     if (selectedCategory !== 'all' && j.category !== selectedCategory) return false;
     return true;

@@ -13,7 +13,7 @@ interface AdminUser {
   university: string | null;
   major: string | null;
   credits: number;
-  reputation: number;
+  trust_score: number;
   is_verified: boolean;
   role: 'user' | 'admin';
   is_banned: boolean;
@@ -25,9 +25,8 @@ interface AdminJob {
   id: string;
   title: string;
   description: string | null;
-  price: number;
   status: 'open' | 'in_progress' | 'completed';
-  owner_id: string;
+  created_by: string;
   deadline: string | null;
   category: string;
   location: string | null;
@@ -94,7 +93,7 @@ export default function AdminDashboard() {
       // Load all appeals with joined data
       const { data: appealsData, error: appealsErr } = await supabase
         .from('appeals')
-        .select('*, user:user_id(name, email), reputation_log:reputation_log_id(*, rater:rater_id(name, email), job:job_id(title, price))')
+        .select('*, user:user_id(name, email), reputation_log:reputation_log_id(*, rater:rater_id(name, email), job:job_id(title))')
         .order('created_at', { ascending: false });
       if (appealsErr) throw appealsErr;
 
@@ -561,44 +560,44 @@ export default function AdminDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-900 border-b border-border-color text-text-muted font-bold">
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-4 uppercase tracking-wider">Thành viên</th>
                         <th className="p-4 uppercase tracking-wider">Trường & Chuyên ngành</th>
-                        <th className="p-4 uppercase tracking-wider text-center">Uy tín / Cấp độ</th>
-                        <th className="p-4 uppercase tracking-wider text-right">Số dư ví (VND)</th>
+                        <th className="p-4 uppercase tracking-wider text-center">Trust Score / Level</th>
+                        <th className="p-4 uppercase tracking-wider text-right">Số dư (Credits)</th>
                         <th className="p-4 uppercase tracking-wider text-center">Trạng thái</th>
                         <th className="p-4 uppercase tracking-wider text-center">Hành động</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-color">
                       {users.map((u) => {
-                        const level = Math.max(1, Math.min(10, Math.floor(u.reputation / 100)));
+                        const level = Math.max(1, Math.min(10, Math.floor(u.credits / 100)));
                         return (
-                          <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                          <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                             <td className="p-4">
                               <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-black text-white text-sm shadow-md">
                                   {u.name ? u.name.slice(0, 2).toUpperCase() : 'SV'}
                                 </div>
                                 <div>
-                                  <span className="font-bold text-foreground block">{u.name || 'Sinh viên'}</span>
-                                  <span className="text-[10px] text-text-muted block">{u.email}</span>
+                                  <span className="font-bold text-gray-900 block">{u.name || 'Sinh viên'}</span>
+                                  <span className="text-[10px] text-gray-500 block">{u.email}</span>
                                 </div>
                               </div>
                             </td>
                             
                             <td className="p-4 max-w-[200px]">
-                              <span className="text-foreground font-bold block truncate">{u.university || 'Chưa rõ'}</span>
-                              <span className="text-[10px] text-text-muted block truncate">{u.major || 'Chưa cập nhật'}</span>
+                              <span className="text-gray-900 font-bold block truncate">{u.university || 'Chưa rõ'}</span>
+                              <span className="text-[10px] text-gray-500 block truncate">{u.major || 'Chưa cập nhật'}</span>
                             </td>
 
                             <td className="p-4 text-center">
-                              <span className="font-extrabold text-amber-500 block">⭐ {u.reputation}</span>
-                              <span className="text-[9px] font-black uppercase text-indigo-600 dark:text-indigo-500 block mt-0.5">Lv.{level}</span>
+                              <span className="font-extrabold text-amber-500 block">⭐ {u.trust_score}</span>
+                              <span className="text-[9px] font-black uppercase text-indigo-600 block mt-0.5">Lv.{level}</span>
                             </td>
 
-                            <td className="p-4 text-right font-black text-foreground">
-                              {u.credits.toLocaleString('vi-VN')}₫
+                            <td className="p-4 text-right font-black text-gray-950">
+                              {u.credits} credits
                             </td>
 
                             <td className="p-4 text-center">
@@ -667,14 +666,14 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {flaggedJobs.map((jb) => {
-                        const owner = userMap.get(jb.owner_id);
+                        const owner = userMap.get(jb.created_by);
                         return (
-                          <div key={jb.id} className="rounded-2xl border border-rose-500/20 bg-card-bg p-6 shadow-card flex flex-col justify-between border-l-4">
+                          <div key={jb.id} className="rounded-2xl border border-rose-500/20 bg-white p-6 shadow-sm flex flex-col justify-between border-l-4 border-l-rose-500">
                             <div>
                               <div className="flex justify-between items-start gap-4 mb-2">
-                                <h4 className="text-base font-black text-rose-600 truncate">{jb.title}</h4>
-                                <span className="font-black text-indigo-600 dark:text-indigo-400 text-sm whitespace-nowrap">
-                                  {jb.price.toLocaleString('vi-VN')}₫
+                                <h4 className="text-base font-black text-rose-650 truncate">{jb.title}</h4>
+                                <span className="font-black text-indigo-600 text-sm whitespace-nowrap">
+                                  🪙 30 credits
                                 </span>
                               </div>
 

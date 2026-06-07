@@ -123,11 +123,10 @@ export default function ProfilePage() {
     }
   };
 
-  const reputation = profile.reputation ?? 100;
-  const userLevel = Math.max(1, Math.min(10, Math.floor(reputation / 100)));
+  const credits = profile.credits ?? 100;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       <Navbar />
 
       <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -140,7 +139,7 @@ export default function ProfilePage() {
           
           {/* LEFT: Avatar box & Stats card */}
           <div className="lg:col-span-4 flex flex-col gap-6">
-            <div className="rounded-2xl border border-border-color bg-card-bg p-6 text-center shadow-card">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
               
               {/* Profile image picker */}
               <div className="relative mx-auto w-24 h-24 mb-4 group">
@@ -148,10 +147,10 @@ export default function ProfilePage() {
                   <img
                     src={profile.avatar_url}
                     alt="Avatar"
-                    className="w-24 h-24 rounded-2xl object-cover border border-border-color shadow-md"
+                    className="w-24 h-24 rounded-2xl object-cover border border-gray-200 shadow-sm"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white shadow-lg">
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-black text-white shadow-md">
                     {profile.name ? profile.name.slice(0, 2).toUpperCase() : 'SV'}
                   </div>
                 )}
@@ -159,7 +158,7 @@ export default function ProfilePage() {
                 {/* Upload overlay hover trigger */}
                 <label
                   htmlFor="avatar-input"
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 text-[10px] font-black uppercase text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-indigo-500/40"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-[10px] font-black uppercase text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-indigo-500/40"
                 >
                   {uploadingAvatar ? 'Đang tải...' : 'Thay ảnh'}
                   <input
@@ -173,56 +172,56 @@ export default function ProfilePage() {
                 </label>
               </div>
 
-              <h2 className="text-lg font-bold text-foreground truncate">{profile.name || 'Sinh Viên'}</h2>
-              <span className="text-[10px] text-text-muted block truncate mb-4">{profile.email}</span>
+              <h2 className="text-lg font-bold text-gray-900 truncate">{profile.name || 'Sinh Viên'}</h2>
+              <span className="text-[10px] text-gray-500 block truncate mb-4">{profile.email}</span>
 
               {/* Verified badge indicators */}
               {profile.is_verified ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-600">
                   ✓ Sinh viên đã xác thực
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-600">
                   ⚠️ Đang đợi duyệt thẻ
                 </span>
               )}
 
-              <div className="h-px bg-border-color w-full my-4" />
+              <div className="h-px bg-gray-150 w-full my-4" />
 
               {/* Stats detail grid */}
               <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div className="bg-background rounded-xl p-2.5 border border-border-color">
-                  <span className="block text-[9px] font-black uppercase text-text-muted mb-0.5">Uy tín</span>
-                  <span className="font-extrabold text-amber-500 text-sm">⭐ {reputation}</span>
+                <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-150">
+                  <span className="block text-[9px] font-bold uppercase text-gray-500 mb-0.5">Số dư</span>
+                  <span className="font-extrabold text-indigo-650 text-sm">🪙 {credits}</span>
                 </div>
-                <div className="bg-background rounded-xl p-2.5 border border-border-color">
-                  <span className="block text-[9px] font-black uppercase text-text-muted mb-0.5">Cấp độ</span>
-                  <span className="font-black text-indigo-600 dark:text-indigo-500 text-sm">Lv.{userLevel}</span>
+                <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-150">
+                  <span className="block text-[9px] font-bold uppercase text-gray-500 mb-0.5">Trust Score</span>
+                  <span className="font-black text-amber-500 text-sm">⭐ {profile.trust_score}</span>
                 </div>
               </div>
             </div>
 
             {/* Profile guide box */}
-            <div className="rounded-2xl border border-border-color bg-card-bg/40 p-4 text-xs text-text-muted">
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-500">
               💡 <strong>Mẹo:</strong> Hãy điền đầy đủ chuyên ngành đào tạo và tài khoản mạng xã hội để tăng mức độ tin tưởng đối với các nhà tuyển dụng khi đăng ký ứng tuyển việc làm!
             </div>
           </div>
 
           {/* RIGHT: Form editor (8 cols) */}
-          <div className="lg:col-span-8 rounded-2xl border border-border-color bg-card-bg p-6 shadow-card">
-            <h3 className="text-lg font-bold text-foreground mb-1">Cài đặt hồ sơ cá nhân</h3>
-            <p className="text-xs text-text-muted mb-6">
+          <div className="lg:col-span-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Cài đặt hồ sơ cá nhân</h3>
+            <p className="text-xs text-gray-500 mb-6">
               Cập nhật thông tin chi tiết để peers/employers nhận dạng khi giao dịch.
             </p>
 
             {errorMsg && (
-              <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600 dark:text-rose-500">
+              <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600">
                 ⚠️ {errorMsg}
               </div>
             )}
 
             {successMsg && (
-              <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-650 dark:text-emerald-500">
+              <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-600">
                 ✓ {successMsg}
               </div>
             )}
@@ -231,14 +230,14 @@ export default function ProfilePage() {
               
               {/* School (Locked) */}
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                   Trường Đại học (Khóa)
                 </label>
                 <input
                   type="text"
                   disabled
                   value={profile.university || 'Đại học'}
-                  className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-xl px-4 py-3 text-slate-400 dark:text-slate-500 text-sm cursor-not-allowed"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-400 text-sm cursor-not-allowed"
                 />
               </div>
 
@@ -246,7 +245,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Display Name */}
                 <div>
-                  <label htmlFor="display-name" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                  <label htmlFor="display-name" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                     Tên hiển thị
                   </label>
                   <input
@@ -257,13 +256,13 @@ export default function ProfilePage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full form-input rounded-xl px-4 py-3 text-sm"
+                    className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
                   />
                 </div>
 
                 {/* Major */}
                 <div>
-                  <label htmlFor="major" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                  <label htmlFor="major" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                     Chuyên ngành học
                   </label>
                   <input
@@ -274,14 +273,14 @@ export default function ProfilePage() {
                     value={major}
                     onChange={(e) => setMajor(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full form-input rounded-xl px-4 py-3 text-sm"
+                    className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
                   />
                 </div>
               </div>
 
               {/* Bio description */}
               <div>
-                <label htmlFor="bio" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                <label htmlFor="bio" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                   Giới thiệu bản thân
                 </label>
                 <textarea
@@ -291,7 +290,7 @@ export default function ProfilePage() {
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full form-input rounded-xl px-4 py-3 text-sm resize-none"
+                  className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm resize-none"
                 />
               </div>
 
@@ -299,7 +298,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Facebook URL */}
                 <div>
-                  <label htmlFor="facebook-link" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                  <label htmlFor="facebook-link" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                     Link Facebook cá nhân
                   </label>
                   <input
@@ -309,13 +308,13 @@ export default function ProfilePage() {
                     value={facebookUrl}
                     onChange={(e) => setFacebookUrl(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full form-input rounded-xl px-4 py-3 text-sm"
+                    className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
                   />
                 </div>
 
                 {/* Instagram URL */}
                 <div>
-                  <label htmlFor="instagram-link" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                  <label htmlFor="instagram-link" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
                     Link Instagram cá nhân
                   </label>
                   <input
@@ -325,7 +324,7 @@ export default function ProfilePage() {
                     value={instagramUrl}
                     onChange={(e) => setInstagramUrl(e.target.value)}
                     disabled={isSubmitting}
-                    className="w-full form-input rounded-xl px-4 py-3 text-sm"
+                    className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
                   />
                 </div>
               </div>

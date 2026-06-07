@@ -116,11 +116,11 @@ export default function Navbar() {
   };
 
   // Compute Gamified Level: Lv. 1 up to Lv. 10
-  const reputation = profile?.reputation ?? 100;
-  const userLevel = Math.max(1, Math.min(10, Math.floor(reputation / 100)));
+  const credits = profile?.credits ?? 100;
+  const userLevel = Math.max(1, Math.min(10, Math.floor(credits / 100)));
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border-color bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         
         {/* Brand Logo Link to Dashboard */}
@@ -144,7 +144,7 @@ export default function Navbar() {
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-border-color bg-card-bg text-foreground hover:bg-border-color transition-colors shadow-sm cursor-pointer"
+            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-750 hover:bg-gray-100 transition-colors shadow-sm cursor-pointer"
             aria-label="Toggle Theme"
           >
             {theme === 'dark' ? '☀️' : '🌙'}
@@ -152,24 +152,24 @@ export default function Navbar() {
 
           {profile && (
             <>
-              {/* Reputation & Level */}
-              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-3.5 py-1.5 shadow-[0_0_15px_rgba(245,158,11,0.04)]">
+              {/* Trust Score & Level */}
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-50 px-3.5 py-1.5 shadow-[0_0_15px_rgba(245,158,11,0.04)]">
                 <span className="text-xs">⭐</span>
-                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Uy tín:</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Trust:</span>
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-black text-amber-500">{reputation}</span>
-                  <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[8px] font-black text-amber-400">
+                  <span className="text-xs font-black text-amber-600">{profile.trust_score ?? 0}</span>
+                  <span className="rounded-full bg-amber-100 border border-amber-200 px-1.5 py-0.2 text-[8px] font-black text-amber-700">
                     Cấp {userLevel}
                   </span>
                 </div>
               </div>
 
-              {/* VND Credit Balance */}
-              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-1.5 shadow-[0_0_15px_rgba(16,185,129,0.04)]">
-                <span className="text-xs">💰</span>
-                <span className="hidden md:inline text-[10px] text-text-muted font-bold uppercase tracking-wider">Số dư:</span>
-                <span className="text-xs sm:text-sm font-black text-emerald-500 tracking-wide">
-                  {(profile.credits ?? 0).toLocaleString('vi-VN')}₫
+              {/* Credits Balance */}
+              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-50 px-3.5 py-1.5 shadow-[0_0_15px_rgba(16,185,129,0.04)]">
+                <span className="text-xs">🪙</span>
+                <span className="hidden md:inline text-[10px] text-gray-500 font-bold uppercase tracking-wider">Số dư:</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-600 tracking-wide">
+                  {credits} credits
                 </span>
               </div>
 

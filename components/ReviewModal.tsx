@@ -93,9 +93,9 @@ export default function ReviewModal({
       <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-md rounded-2xl border border-border-color bg-card-bg p-6 shadow-2xl animate-scale-in z-10">
-        <h3 className="text-lg font-bold text-foreground mb-1">Đánh giá đối tác (Đánh giá ẩn)</h3>
-        <p className="text-xs text-text-muted mb-6">
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl animate-scale-in z-10">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Đánh giá đối tác (Đánh giá ẩn)</h3>
+        <p className="text-xs text-gray-500 mb-6">
           Đánh giá của bạn sẽ được giữ kín hoàn toàn cho đến khi cả hai bên đánh giá xong, hoặc quá hạn 72h.
         </p>
 
@@ -107,8 +107,8 @@ export default function ReviewModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Star selector */}
-          <div className="flex flex-col items-center justify-center gap-2 py-2 bg-slate-50 border border-slate-100 rounded-xl">
-            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+          <div className="flex flex-col items-center justify-center gap-2 py-2 bg-gray-50 border border-gray-150 rounded-xl">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Chọn mức độ hài lòng
             </span>
             <div className="flex gap-2">
@@ -137,7 +137,7 @@ export default function ReviewModal({
 
           {/* Comment text area */}
           <div>
-            <label htmlFor="comment" className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="comment" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
               Nhận xét về đối tác
             </label>
             <textarea
@@ -147,7 +147,7 @@ export default function ReviewModal({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm resize-none"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm resize-none"
             />
           </div>
 
@@ -163,13 +163,13 @@ export default function ReviewModal({
                 accept="image/*"
                 onChange={handleFileChange}
                 disabled={isSubmitting}
-                className="w-full text-xs text-text-muted file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-rose-500/10 file:text-rose-500 hover:file:bg-rose-500/20 file:cursor-pointer"
+                className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-rose-500/10 file:text-rose-500 hover:file:bg-rose-500/20 file:cursor-pointer"
               />
-              <p className="text-[10px] text-text-muted mt-2">
+              <p className="text-[10px] text-gray-400 mt-2">
                 * Bắt buộc cung cấp minh chứng (ảnh chụp màn hình lỗi/trao đổi) để hỗ trợ quá trình khiếu nại.
               </p>
               {proofFile && (
-                <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-500 font-bold">
+                <div className="mt-2 text-[10px] text-emerald-600 font-bold">
                   ✓ Đã chọn: {proofFile.name} ({(proofFile.size / 1024).toFixed(1)} KB)
                 </div>
               )}
@@ -177,12 +177,12 @@ export default function ReviewModal({
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 justify-end pt-2 border-t border-border-color">
+          <div className="flex gap-3 justify-end pt-2 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-xl border border-border-color px-4 py-2.5 text-xs font-bold text-foreground hover:bg-border-color transition-colors cursor-pointer"
+              className="rounded-xl border border-gray-300 px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               Hủy
             </button>

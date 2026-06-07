@@ -138,8 +138,8 @@ export default function SignupPage() {
               major: major.trim(),
               student_card_url: cardUrl,
               is_verified: false,
-              credits: 500000,
-              reputation: 100,
+              credits: 100,
+              trust_score: 0,
               flagged_reason: flaggedReason,
             },
           ]);
@@ -174,30 +174,30 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center p-4">
       {/* Subtle Glow Effects */}
       <div className="absolute top-10 left-10 h-72 w-72 rounded-full bg-indigo-500/5 blur-3xl -z-10" />
       <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-purple-500/5 blur-3xl -z-10" />
 
-      <div className="w-full max-w-md rounded-2xl border border-border-color bg-card-bg p-8 shadow-card">
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-black text-white shadow-lg mb-3">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-black text-white shadow-md mb-3">
             U
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Đăng ký thành viên</h1>
-          <p className="text-xs text-text-muted mt-1.5">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">Đăng ký thành viên</h1>
+          <p className="text-xs text-gray-500 mt-1.5">
             Gia nhập cộng đồng chợ vi việc làm dành riêng cho sinh viên Việt Nam.
           </p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600 dark:text-rose-500">
+          <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600">
             ⚠️ {errorMsg}
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-600 dark:text-emerald-500">
+          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-600">
             ✓ {successMsg}
           </div>
         )}
@@ -205,7 +205,7 @@ export default function SignupPage() {
         <form onSubmit={handleSignup} className="space-y-4">
           {/* Full Name */}
           <div>
-            <label htmlFor="name" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="name" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Họ và tên
             </label>
             <input
@@ -216,13 +216,13 @@ export default function SignupPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Email Sinh Viên (.edu.vn)
             </label>
             <input
@@ -233,13 +233,13 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Mật khẩu
             </label>
             <input
@@ -250,13 +250,13 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
           {/* University selection */}
           <div>
-            <label htmlFor="university" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="university" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Trường Đại học
             </label>
             <select
@@ -264,7 +264,7 @@ export default function SignupPage() {
               value={university}
               onChange={(e) => setUniversity(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm cursor-pointer"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm cursor-pointer"
             >
               <option value="Đại học Bách Khoa Hà Nội (HUST)">Đại học Bách Khoa Hà Nội (HUST)</option>
               <option value="Đại học Ngoại Thương (FTU)">Đại học Ngoại Thương (FTU)</option>
@@ -277,7 +277,7 @@ export default function SignupPage() {
 
           {/* Major */}
           <div>
-            <label htmlFor="major" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="major" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Chuyên ngành đào tạo
             </label>
             <input
@@ -288,13 +288,13 @@ export default function SignupPage() {
               value={major}
               onChange={(e) => setMajor(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
           {/* Student Card File */}
           <div>
-            <label htmlFor="card-upload" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="card-upload" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Ảnh chụp thẻ sinh viên (Bắt buộc)
             </label>
             <input
@@ -304,10 +304,10 @@ export default function SignupPage() {
               accept="image/*"
               onChange={handleFileChange}
               disabled={isSubmitting}
-              className="w-full text-xs text-text-muted file:mr-3 file:py-2.5 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
+              className="w-full text-xs text-gray-500 file:mr-3 file:py-2.5 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
             />
             {cardFile && (
-              <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-500 font-bold">
+              <div className="mt-2 text-[10px] text-emerald-650 font-bold">
                 ✓ Đã chọn file: {cardFile.name} ({(cardFile.size / 1024).toFixed(1)} KB)
               </div>
             )}
@@ -317,12 +317,12 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full relative flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-lg hover:from-blue-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer mt-6 shadow-md"
+            className="w-full relative flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer mt-6 shadow-sm"
           >
             {isSubmitting ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border border-t-transparent border-white" />
-                Đang tạo tài khoản & lưu thẻ...
+                Đang đăng ký...
               </>
             ) : (
               'Đăng ký tài khoản'
@@ -330,7 +330,7 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <div className="text-center mt-6 text-xs text-text-muted">
+        <div className="text-center mt-6 text-xs text-gray-500">
           Đã có tài khoản?{' '}
           <Link href="/login" className="font-bold text-indigo-600 hover:underline">
             Đăng nhập ngay

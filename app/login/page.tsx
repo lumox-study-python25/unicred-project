@@ -45,30 +45,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center p-4">
       {/* Subtle Glow Effects */}
       <div className="absolute top-10 left-10 h-72 w-72 rounded-full bg-indigo-500/5 blur-3xl -z-10" />
       <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-purple-500/5 blur-3xl -z-10" />
 
-      <div className="w-full max-w-md rounded-2xl border border-border-color bg-card-bg p-8 shadow-card">
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-black text-white shadow-lg mb-3">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-black text-white shadow-md mb-3">
             U
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Đăng nhập UniCred</h1>
-          <p className="text-xs text-text-muted mt-1.5">
+          <h1 className="text-2xl font-black tracking-tight text-gray-900">Đăng nhập UniCred</h1>
+          <p className="text-xs text-gray-500 mt-1.5">
             Cổng thông tin chợ việc làm sinh viên - Đăng nhập tài khoản trường.
           </p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600 dark:text-rose-500">
+          <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-600">
             ⚠️ {errorMsg}
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-600 dark:text-emerald-500">
+          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-600">
             ✓ {successMsg}
           </div>
         )}
@@ -76,7 +76,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
               Email Sinh Viên
             </label>
             <input
@@ -87,14 +87,14 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
           {/* Password */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-text-muted">
+              <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
                 Mật khẩu
               </label>
             </div>
@@ -106,7 +106,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isSubmitting}
-              className="w-full form-input rounded-xl px-4 py-3 text-sm"
+              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
             />
           </div>
 
@@ -114,7 +114,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full relative flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-lg hover:from-blue-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer mt-6 shadow-md"
+            className="w-full relative flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer mt-6 shadow-sm"
           >
             {isSubmitting ? (
               <>
@@ -127,7 +127,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="text-center mt-6 text-xs text-text-muted">
+        <div className="text-center mt-6 text-xs text-gray-500">
           Chưa có tài khoản?{' '}
           <Link href="/signup" className="font-bold text-indigo-600 hover:underline">
             Đăng ký ngay (.edu.vn)
