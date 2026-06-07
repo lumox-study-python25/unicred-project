@@ -59,7 +59,6 @@ const { data } = await supabase
 .eq('id', uid)
 .maybeSingle();
 
-```
   if (!data) {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     const userEmail = currentUser?.email || '';
@@ -100,7 +99,6 @@ const { data } = await supabase
   console.error('[Auth Error]', err);
   setProfile(null);
 }
-```
 
 };
 
@@ -115,7 +113,6 @@ const init = async () => {
 try {
 const { data: { session } } = await supabase.auth.getSession();
 
-```
     if (!session) {
       setUser(null);
       setProfile(null);
@@ -151,14 +148,12 @@ const { data: { subscription } } = supabase.auth.onAuthStateChange(
 return () => {
   subscription.unsubscribe();
 };
-```
 
 }, []);
 
 useEffect(() => {
 if (loading) return;
 
-```
 const isAuthRoute = pathname === '/login' || pathname === '/signup';
 
 if (!user && !isAuthRoute) {
@@ -166,7 +161,6 @@ if (!user && !isAuthRoute) {
 } else if (user && isAuthRoute) {
   router.replace('/');
 }
-```
 
 }, [user, pathname, loading, router]);
 
