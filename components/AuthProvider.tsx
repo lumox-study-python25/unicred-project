@@ -64,24 +64,24 @@ const { data } = await supabase
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     const userEmail = currentUser?.email || '';
 
-    const fallbackProfile = {
+    const fallbackProfile: UserProfile = {
       id: uid,
       email: userEmail,
       name: userEmail ? userEmail.split('@')[0] : 'Sinh Viên',
       university: 'Đại học',
       major: 'Chưa cập nhật',
+      bio: null,
+      avatar_url: null,
       credits: 100,
       trust_score: 0,
       freelancer_reputation: 100,
       client_reputation: 100,
       reputation: 100,
       is_verified: false,
-      avatar_url: null,
-      bio: null,
       student_card_url: null,
       facebook_url: null,
       instagram_url: null,
-      role: 'user' as const,
+      role: 'user',
       is_banned: false,
       flagged_reason: null,
     };
@@ -105,7 +105,9 @@ const { data } = await supabase
 };
 
 const refreshProfile = async () => {
-if (user) await fetchProfile(user.id);
+if (user) {
+await fetchProfile(user.id);
+}
 };
 
 useEffect(() => {
@@ -123,7 +125,7 @@ const { data: { session } } = await supabase.auth.getSession();
     setUser(session.user);
     await fetchProfile(session.user.id);
   } catch (err) {
-    console.error(err);
+    console.error('[Init Error]', err);
   } finally {
     setLoading(false);
   }
@@ -146,7 +148,9 @@ const { data: { subscription } } = supabase.auth.onAuthStateChange(
   }
 );
 
-return () => subscription.unsubscribe();
+return () => {
+  subscription.unsubscribe();
+};
 ```
 
 }, []);
@@ -164,7 +168,7 @@ if (!user && !isAuthRoute) {
 }
 ```
 
-}, [user, pathname, loading]);
+}, [user, pathname, loading, router]);
 
 const signOut = async () => {
 await supabase.auth.signOut();
