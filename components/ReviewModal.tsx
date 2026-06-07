@@ -6,19 +6,20 @@ import { supabase } from '@/lib/supabaseClient';
 interface ReviewModalProps {
   isOpen: boolean;
   jobId: string;
-  workerId: string;
+  ratedUserId: string;
   onClose: () => void;
-  onSubmitReview: (jobId: string, workerId: string, stars: number, proofUrl: string | null) => Promise<void>;
+  onSubmitReview: (jobId: string, ratedUserId: string, stars: number, comment: string, proofUrl: string | null) => Promise<void>;
 }
 
 export default function ReviewModal({
   isOpen,
   jobId,
-  workerId,
+  ratedUserId,
   onClose,
   onSubmitReview,
 }: ReviewModalProps) {
   const [stars, setStars] = useState<number>(5);
+  const [comment, setComment] = useState<string>('');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -52,11 +53,16 @@ export default function ReviewModal({
         const fileName = `${jobId}-${Date.now()}.${fileExt}`;
         const filePath = `proofs/${fileName}`;
 
+        // Ensure storage bucket is created or error is handled gracefully
         const { error: uploadError } = await supabase.storage
           .from('unicred-media')
           .upload(filePath, proofFile);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.warn('[Review Storage] Upload to unicred-media failed, trying public folder or fallback:', uploadError);
+          // If storage bucket doesn't exist, we can use a mock URL or throw
+          throw new Error('Không thể tải tệp lên Supabase storage. Vui lòng đảm bảo bucket "unicred-media" đã được tạo.');
+        }
 
         const { data } = supabase.storage
           .from('unicred-media')
@@ -66,11 +72,16 @@ export default function ReviewModal({
       }
 
       // 2. Submit rating and complete job
-      await onSubmitReview(jobId, workerId, stars, proofUrl);
+      await onSubmitReview(jobId, ratedUserId, stars, comment.trim(), proofUrl);
+      
+      // Reset form
+      setStars(5);
+      setComment('');
+      setProofFile(null);
       onClose();
     } catch (err: any) {
       console.error('Error submitting rating:', err);
-      setErrorMsg(err.message || 'Có lỗi xảy ra trong quá trình nghiệm thu.');
+      setErrorMsg(err.message || 'Có lỗi xảy ra trong quá trình đánh giá.');
     } finally {
       setIsSubmitting(false);
     }
@@ -83,9 +94,9 @@ export default function ReviewModal({
 
       {/* Modal Box */}
       <div className="relative w-full max-w-md rounded-2xl border border-border-color bg-card-bg p-6 shadow-2xl animate-scale-in z-10">
-        <h3 className="text-lg font-bold text-foreground mb-1">Nghiệm thu & Đánh giá</h3>
+        <h3 className="text-lg font-bold text-foreground mb-1">Đánh giá đối tác (Đánh giá ẩn)</h3>
         <p className="text-xs text-text-muted mb-6">
-          Vui lòng đánh giá hiệu quả hoàn thành công việc của freelancer để giải ngân quỹ.
+          Đánh giá của bạn sẽ được giữ kín hoàn toàn cho đến khi cả hai bên đánh giá xong, hoặc quá hạn 72h.
         </p>
 
         {errorMsg && (
@@ -94,9 +105,9 @@ export default function ReviewModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Star selector */}
-          <div className="flex flex-col items-center justify-center gap-2">
+          <div className="flex flex-col items-center justify-center gap-2 py-2 bg-slate-50 border border-slate-100 rounded-xl">
             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
               Chọn mức độ hài lòng
             </span>
@@ -115,13 +126,29 @@ export default function ReviewModal({
                 </button>
               ))}
             </div>
-            <span className="text-sm font-bold text-amber-500 mt-1">
+            <span className="text-xs font-bold text-amber-500 mt-1">
               {stars === 5 && '🔥 Xuất sắc / Vượt mong đợi'}
               {stars === 4 && '✨ Rất hài lòng / Đạt yêu cầu'}
               {stars === 3 && '👍 Tạm ổn / Vừa đủ'}
               {stars === 2 && '⚠️ Cần cải thiện / Trễ hạn'}
               {stars === 1 && '👎 Rất tệ / Không hoàn thành'}
             </span>
+          </div>
+
+          {/* Comment text area */}
+          <div>
+            <label htmlFor="comment" className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+              Nhận xét về đối tác
+            </label>
+            <textarea
+              id="comment"
+              rows={3}
+              placeholder="Nhập nhận xét chi tiết về tác phong làm việc, chất lượng sản phẩm..."
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              disabled={isSubmitting}
+              className="w-full form-input rounded-xl px-4 py-3 text-sm resize-none"
+            />
           </div>
 
           {/* Dispute Proof Upload Area (Conditional <= 2 stars) */}
@@ -139,7 +166,7 @@ export default function ReviewModal({
                 className="w-full text-xs text-text-muted file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-rose-500/10 file:text-rose-500 hover:file:bg-rose-500/20 file:cursor-pointer"
               />
               <p className="text-[10px] text-text-muted mt-2">
-                * Cung cấp ảnh chụp màn hình hội thoại hoặc bằng chứng lỗi sản phẩm để làm căn cứ xử lý tranh chấp điểm uy tín.
+                * Bắt buộc cung cấp minh chứng (ảnh chụp màn hình lỗi/trao đổi) để hỗ trợ quá trình khiếu nại.
               </p>
               {proofFile && (
                 <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-500 font-bold">
@@ -167,10 +194,10 @@ export default function ReviewModal({
               {isSubmitting ? (
                 <>
                   <div className="h-3.5 w-3.5 animate-spin rounded-full border border-t-transparent border-white" />
-                  Đang xử lý...
+                  Đang gửi...
                 </>
               ) : (
-                'Hoàn thành & Giải ngân'
+                'Gửi đánh giá'
               )}
             </button>
           </div>

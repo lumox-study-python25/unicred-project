@@ -14,6 +14,9 @@ export interface UserProfile {
   bio: string | null;
   avatar_url: string | null;
   credits: number;
+  trust_score: number;
+  freelancer_reputation: number;
+  client_reputation: number;
   reputation: number;
   is_verified: boolean;
   student_card_url: string | null;
@@ -67,7 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: userEmail ? userEmail.split('@')[0] : 'Sinh Viên',
           university: 'Đại học Bách Khoa Hà Nội (HUST)',
           major: 'Chưa cập nhật',
-          credits: 500000,
+          credits: 100,
+          trust_score: 0,
+          freelancer_reputation: 100,
+          client_reputation: 100,
           reputation: 100,
           is_verified: false,
           avatar_url: null,
@@ -105,7 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: 'Sinh Viên',
         university: 'Đại học',
         major: 'Chưa cập nhật',
-        credits: 500000,
+        credits: 100,
+        trust_score: 0,
+        freelancer_reputation: 100,
+        client_reputation: 100,
         reputation: 100,
         is_verified: false,
         avatar_url: null,
@@ -165,7 +174,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: userEmail ? userEmail.split('@')[0] : 'Sinh Viên',
           university: 'Đại học Bách Khoa Hà Nội (HUST)',
           major: 'Chưa cập nhật',
-          credits: 500000,
+          credits: 100,
+          trust_score: 0,
+          freelancer_reputation: 100,
+          client_reputation: 100,
           reputation: 100,
           is_verified: false,
           avatar_url: null,

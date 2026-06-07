@@ -1,12 +1,18 @@
 -- =======================================================
 -- UNICRED: CHỢ VIỆC LÀM SINH VIÊN VIỆT NAM (SCHEMA UPDATE)
+-- CREDIT-BASED TRUST PLATFORM (NO REAL MONEY)
 -- =======================================================
 -- Run these queries in the Supabase SQL Editor to set up the database!
 
 -- Cleanup existing tables in reverse-relationship order
-DROP TABLE IF EXISTS ratings CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS conversations CASCADE;
+DROP TABLE IF EXISTS appeals CASCADE;
+DROP TABLE IF EXISTS reputation_logs CASCADE;
+DROP TABLE IF EXISTS credit_logs CASCADE;
 DROP TABLE IF EXISTS contracts CASCADE;
-DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS job_applications CASCADE;
 DROP TABLE IF EXISTS jobs CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
@@ -19,8 +25,12 @@ CREATE TABLE users (
   university TEXT,
   major TEXT,
   avatar_url TEXT,
-  credits INTEGER DEFAULT 500000, -- Default 500.000₫ for testing!
-  reputation INTEGER DEFAULT 100,
+  bio TEXT,
+  credits INTEGER DEFAULT 100, -- Default 100 virtual credits
+  trust_score INTEGER DEFAULT 0, -- Default 0 trust score
+  freelancer_reputation INTEGER DEFAULT 100 CHECK (freelancer_reputation BETWEEN 0 AND 100),
+  client_reputation INTEGER DEFAULT 100 CHECK (client_reputation BETWEEN 0 AND 100),
+  reputation INTEGER DEFAULT 100, -- For legacy/fallback compatibility
   is_verified BOOLEAN DEFAULT false,
   role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin')),
   is_banned BOOLEAN DEFAULT false,
@@ -35,19 +45,21 @@ CREATE TABLE jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT,
-  price INTEGER DEFAULT 0, -- Store as integer in VND (e.g. 100000)
-  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'completed')),
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'completed', 'cancelled')),
   owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  assigned_worker_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  client_approved BOOLEAN DEFAULT false,
+  worker_approved BOOLEAN DEFAULT false,
+  category TEXT NOT NULL, -- e.g. coding, design, writing, translation, video, others
+  location TEXT, -- e.g. Remote, FTU, HUST, etc.
   deadline TIMESTAMP WITH TIME ZONE,
-  category TEXT NOT NULL, -- e.g. Coding, Design, Writing, Translation, Video, Others
-  location TEXT, -- Optional, e.g. Remote, FTU, HUST, etc.
   is_flagged BOOLEAN DEFAULT false,
   flagged_reason TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Create Applications Table (Freelancer applications)
-CREATE TABLE applications (
+-- 3. Create Job Applications Table
+CREATE TABLE job_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -55,7 +67,7 @@ CREATE TABLE applications (
   UNIQUE(job_id, user_id)
 );
 
--- 4. Create Contracts Table (Bound relationship of hire)
+-- 4. Create Contracts Table (Bound relationship of hire for backward-compatibility)
 CREATE TABLE contracts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
@@ -64,101 +76,44 @@ CREATE TABLE contracts (
   UNIQUE(job_id)
 );
 
--- 5. Create Ratings Table (Rating system + low star proof file)
-CREATE TABLE ratings (
+-- 5. Create Credit Logs Table (Virtual Economy Transactions)
+CREATE TABLE credit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  type TEXT NOT NULL, -- e.g. job_post_stake, job_accept_stake, job_completed_refund_bonus, job_cancelled_forfeit
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Create Reputation Logs Table (Rating review system + Blind review)
+CREATE TABLE reputation_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
   rater_id UUID REFERENCES users(id) ON DELETE CASCADE,
   rated_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   stars INTEGER NOT NULL CHECK (stars >= 1 AND stars <= 5),
-  proof_image_url TEXT, -- Required in UI if stars <= 2
+  comment TEXT,
+  proof_image_url TEXT, -- Low rating proof image
+  is_visible_to_public BOOLEAN DEFAULT false, -- Starts false for blind review
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE(job_id, rater_id) -- One rating per job
+  UNIQUE(job_id, rater_id)
 );
 
--- 6. Enable Row Level Security (RLS) and Set Policies
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
-
--- POLICY ON "users"
-DROP POLICY IF EXISTS "Allow public read users" ON users;
-DROP POLICY IF EXISTS "Allow insert own user row" ON users;
-DROP POLICY IF EXISTS "Users can view own profile" ON users;
-DROP POLICY IF EXISTS "Users can insert own profile" ON users;
-
-CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON users FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "Allow update own user row" ON users FOR UPDATE USING (auth.uid() = id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-
-
--- POLICY ON "jobs"
-CREATE POLICY "Allow public read jobs" ON jobs FOR SELECT USING (true);
-CREATE POLICY "Allow authenticated insert jobs" ON jobs FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
-CREATE POLICY "Allow update own jobs or admin" ON jobs FOR UPDATE USING (auth.uid() = owner_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-CREATE POLICY "Allow delete own jobs or admin" ON jobs FOR DELETE USING (auth.uid() = owner_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-
--- POLICY ON "applications"
-CREATE POLICY "Allow read all applications" ON applications FOR SELECT USING (true);
-CREATE POLICY "Allow insert own applications" ON applications FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Allow delete own applications" ON applications FOR DELETE USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
-
--- POLICY ON "contracts"
-CREATE POLICY "Allow read contracts" ON contracts FOR SELECT USING (true);
-CREATE POLICY "Allow insert own contracts" ON contracts FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM jobs WHERE id = job_id AND owner_id = auth.uid()) OR
-  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+-- 7. Create Appeals Table (Appeals System for ratings/penalties)
+CREATE TABLE appeals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  reputation_log_id UUID REFERENCES reputation_logs(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  proof_image_url TEXT NOT NULL, -- Required attachment proof
+  status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Disputed_Frozen', 'Finalized')),
+  admin_comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-CREATE POLICY "Allow update own contracts" ON contracts FOR UPDATE USING (
-  worker_id = auth.uid() OR 
-  EXISTS (SELECT 1 FROM jobs WHERE id = job_id AND owner_id = auth.uid()) OR
-  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-);
-
--- POLICY ON "ratings"
-CREATE POLICY "Allow read ratings" ON ratings FOR SELECT USING (true);
-CREATE POLICY "Allow insert own ratings" ON ratings FOR INSERT TO authenticated WITH CHECK (
-  rater_id = auth.uid() OR
-  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-);
-
--- 7. SQL for Database Auto-Profile Creation Trigger (SECURITY DEFINER to bypass RLS)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.users (id, email, name, university, major, credits, reputation, is_verified, role, is_banned)
-  VALUES (
-    new.id,
-    new.email,
-    COALESCE(split_part(new.email, '@', 1), 'Sinh Viên'),
-    'Đại học Bách Khoa Hà Nội (HUST)',
-    'Chưa cập nhật',
-    500000,
-    100,
-    false,
-    'user',
-    false
-  )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger mapping
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- =======================================================
--- PART 5: MESSAGING SYSTEM
+-- MESSAGING & CONVERSATIONS TABLES
 -- =======================================================
-
-DROP TABLE IF EXISTS messages CASCADE;
-DROP TABLE IF EXISTS conversations CASCADE;
-
 CREATE TABLE conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
@@ -177,93 +132,9 @@ CREATE TABLE messages (
   created_at TIMESTAMP DEFAULT now()
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
-
--- Enable RLS
-ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-
--- Conversations RLS
-CREATE POLICY "Allow select conversations for participants"
-ON conversations
-FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM jobs j
-    WHERE j.id = conversations.job_id
-    AND j.owner_id = auth.uid()
-  )
-  OR worker_id = auth.uid()
-);
-
-CREATE POLICY "Allow insert conversations for participants"
-ON conversations
-FOR INSERT
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM jobs j
-    WHERE j.id = conversations.job_id
-    AND j.owner_id = auth.uid()
-  )
-  OR worker_id = auth.uid()
-);
-
--- Messages RLS
-CREATE POLICY "Participants can read messages"
-ON messages
-FOR SELECT
-USING (
-  sender_id = auth.uid()
-  OR EXISTS (
-    SELECT 1 FROM conversations c
-    JOIN jobs j ON j.id = c.job_id
-    WHERE c.id = messages.conversation_id
-    AND (
-      j.owner_id = auth.uid()
-      OR c.worker_id = auth.uid()
-    )
-  )
-);
-
-CREATE POLICY "Participants can insert messages"
-ON messages
-FOR INSERT
-WITH CHECK (
-  sender_id = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM conversations c
-    JOIN jobs j ON j.id = c.job_id
-    WHERE c.id = messages.conversation_id
-    AND (
-      j.owner_id = auth.uid()
-      OR c.worker_id = auth.uid()
-    )
-  )
-);
-
-CREATE POLICY "Participants can update messages seen status"
-ON messages
-FOR UPDATE
-USING (
-  EXISTS (
-    SELECT 1 FROM conversations c
-    JOIN jobs j ON j.id = c.job_id
-    WHERE c.id = messages.conversation_id
-    AND (
-      j.owner_id = auth.uid()
-      OR c.worker_id = auth.uid()
-    )
-  )
-);
-
 -- =======================================================
 -- NOTIFICATION SYSTEM
 -- =======================================================
-
-DROP TABLE IF EXISTS notifications CASCADE;
-
 CREATE TABLE notifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -274,32 +145,364 @@ CREATE TABLE notifications (
   created_at TIMESTAMP DEFAULT now()
 );
 
--- Indexes
+-- =======================================================
+-- INDEXES FOR SCALE & SPEED
+-- =======================================================
+CREATE INDEX IF NOT EXISTS idx_jobs_owner_id ON jobs(owner_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_worker_id ON jobs(assigned_worker_id);
+CREATE INDEX IF NOT EXISTS idx_job_applications_job_id ON job_applications(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_applications_user_id ON job_applications(user_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_job_id ON contracts(job_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_worker_id ON contracts(worker_id);
+CREATE INDEX IF NOT EXISTS idx_credit_logs_user_id ON credit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_reputation_logs_job_id ON reputation_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_reputation_logs_rated_user_id ON reputation_logs(rated_user_id);
+CREATE INDEX IF NOT EXISTS idx_appeals_user_id ON appeals(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 
--- Enable RLS
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+-- =======================================================
+-- TRIGGERS & PROCEDURES (BUSINESS LOGIC)
+-- =======================================================
 
--- Notifications RLS
-CREATE POLICY "Allow select own notifications"
-ON notifications
-FOR SELECT
-USING (auth.uid() = user_id);
+-- 1. Auto user profile creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (
+    id, email, name, university, major, credits, trust_score, 
+    freelancer_reputation, client_reputation, reputation, is_verified, role, is_banned
+  )
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(split_part(new.email, '@', 1), 'Sinh Viên'),
+    'Đại học Bách Khoa Hà Nội (HUST)',
+    'Chưa cập nhật',
+    100, -- default 100 credits
+    0,   -- default 0 trust score
+    100, -- default 100 reputation
+    100,
+    100,
+    false,
+    'user',
+    false
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE POLICY "Allow update own notifications"
-ON notifications
-FOR UPDATE
-USING (auth.uid() = user_id);
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Trigger for message notifications
+-- 2. Deduct 30 credits from client when job is posted
+CREATE OR REPLACE FUNCTION check_job_post_credits()
+RETURNS trigger AS $$
+DECLARE
+  v_credits INTEGER;
+BEGIN
+  SELECT credits INTO v_credits FROM users WHERE id = NEW.owner_id;
+  IF v_credits < 30 THEN
+    RAISE EXCEPTION 'Số dư credits của bạn không đủ để đăng việc (cần 30 credits cọc, hiện tại bạn có %).', v_credits;
+  END IF;
+  
+  -- Deduct
+  UPDATE users SET credits = credits - 30 WHERE id = NEW.owner_id;
+  
+  -- Log
+  INSERT INTO credit_logs (user_id, amount, type)
+  VALUES (NEW.owner_id, -30, 'job_post_stake');
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_check_job_post_credits ON jobs;
+CREATE TRIGGER trg_check_job_post_credits
+  BEFORE INSERT ON jobs
+  FOR EACH ROW EXECUTE FUNCTION check_job_post_credits();
+
+-- 3. Deduct 30 credits from freelancer when job application is accepted (Staking Mechanism)
+CREATE OR REPLACE FUNCTION check_job_accept_credits()
+RETURNS trigger AS $$
+DECLARE
+  v_credits INTEGER;
+BEGIN
+  IF NEW.assigned_worker_id IS NOT NULL AND (OLD.assigned_worker_id IS NULL OR OLD.assigned_worker_id != NEW.assigned_worker_id) THEN
+    SELECT credits INTO v_credits FROM users WHERE id = NEW.assigned_worker_id;
+    IF v_credits < 30 THEN
+      RAISE EXCEPTION 'Số dư credits của ứng viên không đủ để nhận việc (cần 30 credits cọc).';
+    END IF;
+    
+    -- Deduct
+    UPDATE users SET credits = credits - 30 WHERE id = NEW.assigned_worker_id;
+    
+    -- Log
+    INSERT INTO credit_logs (user_id, amount, type)
+    VALUES (NEW.assigned_worker_id, -30, 'job_accept_stake');
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_check_job_accept_credits ON jobs;
+CREATE TRIGGER trg_check_job_accept_credits
+  BEFORE UPDATE OF assigned_worker_id ON jobs
+  FOR EACH ROW EXECUTE FUNCTION check_job_accept_credits();
+
+-- 4. Automatically mark job completed when both parties approve
+CREATE OR REPLACE FUNCTION check_job_completion_approval()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.client_approved = true AND NEW.worker_approved = true AND NEW.status = 'in_progress' THEN
+    NEW.status := 'completed';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_check_job_completion_approval ON jobs;
+CREATE TRIGGER trg_check_job_completion_approval
+  BEFORE UPDATE OF client_approved, worker_approved ON jobs
+  FOR EACH ROW EXECUTE FUNCTION check_job_completion_approval();
+
+-- 5. Handle refunds + bonuses on job completion or cancellation
+CREATE OR REPLACE FUNCTION handle_job_status_change()
+RETURNS trigger AS $$
+BEGIN
+  -- Job Completed
+  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+    -- Client gets back 30 stake + 10 bonus = 40 credits
+    UPDATE users SET credits = credits + 40 WHERE id = NEW.owner_id;
+    INSERT INTO credit_logs (user_id, amount, type)
+    VALUES (NEW.owner_id, 40, 'job_completed_refund_bonus');
+    UPDATE users SET trust_score = trust_score + 1 WHERE id = NEW.owner_id;
+
+    -- Worker gets back 30 stake + 10 bonus = 40 credits
+    IF NEW.assigned_worker_id IS NOT NULL THEN
+      UPDATE users SET credits = credits + 40 WHERE id = NEW.assigned_worker_id;
+      INSERT INTO credit_logs (user_id, amount, type)
+      VALUES (NEW.assigned_worker_id, 40, 'job_completed_refund_bonus');
+      UPDATE users SET trust_score = trust_score + 1 WHERE id = NEW.assigned_worker_id;
+      
+      -- Set contract status to completed if exists
+      UPDATE contracts SET status = 'completed' WHERE job_id = NEW.id;
+    END IF;
+
+  -- Job Cancelled
+  ELSIF NEW.status = 'cancelled' AND OLD.status != 'cancelled' THEN
+    -- No credit refunds. Staked credits are forfeited.
+    -- Reduce trust score as penalty
+    UPDATE users SET trust_score = GREATEST(0, trust_score - 1) WHERE id = NEW.owner_id;
+    IF NEW.assigned_worker_id IS NOT NULL THEN
+      UPDATE users SET trust_score = GREATEST(0, trust_score - 1) WHERE id = NEW.assigned_worker_id;
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_handle_job_status_change ON jobs;
+CREATE TRIGGER trg_handle_job_status_change
+  AFTER UPDATE OF status ON jobs
+  FOR EACH ROW EXECUTE FUNCTION handle_job_status_change();
+
+-- 6. Blind Review System visibility update
+CREATE OR REPLACE FUNCTION update_reputation_visibility()
+RETURNS trigger AS $$
+DECLARE
+  v_matching_id UUID;
+BEGIN
+  -- Check if there's a matching rating from the other side
+  SELECT id INTO v_matching_id FROM reputation_logs
+  WHERE job_id = NEW.job_id
+    AND rater_id = NEW.rated_user_id
+    AND rated_user_id = NEW.rater_id;
+
+  IF v_matching_id IS NOT NULL THEN
+    -- Both have reviewed, publish both reviews
+    NEW.is_visible_to_public := true;
+    
+    UPDATE reputation_logs
+    SET is_visible_to_public = true
+    WHERE id = v_matching_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_update_reputation_visibility ON reputation_logs;
+CREATE TRIGGER trg_update_reputation_visibility
+  BEFORE INSERT ON reputation_logs
+  FOR EACH ROW EXECUTE FUNCTION update_reputation_visibility();
+
+-- 7. Calculate and update client/freelancer reputation scores
+CREATE OR REPLACE FUNCTION recalculate_user_reputation(p_user_id UUID)
+RETURNS void AS $$
+DECLARE
+  v_freelancer_avg INTEGER;
+  v_client_avg INTEGER;
+BEGIN
+  -- Freelancer reputation (average stars * 20 where user was freelancer, review is public, and no active/pending Disputed_Frozen appeal)
+  SELECT COALESCE(ROUND(AVG(stars) * 20), 100)
+  INTO v_freelancer_avg
+  FROM reputation_logs r
+  JOIN jobs j ON j.id = r.job_id
+  WHERE r.rated_user_id = p_user_id
+    AND j.owner_id != p_user_id
+    AND r.is_visible_to_public = true
+    AND NOT EXISTS (
+      SELECT 1 FROM appeals a
+      WHERE a.reputation_log_id = r.id
+        AND a.status = 'Disputed_Frozen'
+    );
+
+  -- Client reputation (average stars * 20 where user was employer, review is public, and no active/pending Disputed_Frozen appeal)
+  SELECT COALESCE(ROUND(AVG(stars) * 20), 100)
+  INTO v_client_avg
+  FROM reputation_logs r
+  JOIN jobs j ON j.id = r.job_id
+  WHERE r.rated_user_id = p_user_id
+    AND j.owner_id = p_user_id
+    AND r.is_visible_to_public = true
+    AND NOT EXISTS (
+      SELECT 1 FROM appeals a
+      WHERE a.reputation_log_id = r.id
+        AND a.status = 'Disputed_Frozen'
+    );
+
+  -- Update user profile
+  UPDATE users
+  SET freelancer_reputation = v_freelancer_avg,
+      client_reputation = v_client_avg,
+      reputation = v_freelancer_avg
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to recalculate reputation when a log is added or visibility changes
+CREATE OR REPLACE FUNCTION trg_recalculate_reputation_from_log()
+RETURNS trigger AS $$
+BEGIN
+  PERFORM recalculate_user_reputation(NEW.rated_user_id);
+  IF TG_OP = 'UPDATE' AND OLD.rated_user_id != NEW.rated_user_id THEN
+    PERFORM recalculate_user_reputation(OLD.rated_user_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_recalc_reputation_log ON reputation_logs;
+CREATE TRIGGER trg_recalc_reputation_log
+  AFTER INSERT OR UPDATE OF stars, is_visible_to_public, rated_user_id ON reputation_logs
+  FOR EACH ROW EXECUTE FUNCTION trg_recalculate_reputation_from_log();
+
+-- Trigger to recalculate reputation when an appeal is updated (frozen or resolved)
+CREATE OR REPLACE FUNCTION trg_recalculate_reputation_from_appeal()
+RETURNS trigger AS $$
+DECLARE
+  v_rated_user_id UUID;
+BEGIN
+  SELECT rated_user_id INTO v_rated_user_id
+  FROM reputation_logs
+  WHERE id = NEW.reputation_log_id;
+
+  IF v_rated_user_id IS NOT NULL THEN
+    PERFORM recalculate_user_reputation(v_rated_user_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_recalc_reputation_appeal ON appeals;
+CREATE TRIGGER trg_recalc_reputation_appeal
+  AFTER INSERT OR UPDATE OF status ON appeals
+  FOR EACH ROW EXECUTE FUNCTION trg_recalculate_reputation_from_appeal();
+
+-- 8. Appeal Submission Constraints (SLA 72h, text length >= 50, attachment check, max 3/month)
+CREATE OR REPLACE FUNCTION check_appeal_constraints()
+RETURNS trigger AS $$
+DECLARE
+  v_appeal_count INTEGER;
+  v_created_at TIMESTAMP WITH TIME ZONE;
+BEGIN
+  -- Check reason length
+  IF char_length(NEW.reason) < 50 THEN
+    RAISE EXCEPTION 'Nội dung khiếu nại phải có ít nhất 50 ký tự.';
+  END IF;
+
+  -- Check proof image
+  IF NEW.proof_image_url IS NULL OR NEW.proof_image_url = '' THEN
+    RAISE EXCEPTION 'Vui lòng cung cấp minh chứng hình ảnh/tài liệu đính kèm.';
+  END IF;
+
+  -- Check SLA 72h
+  SELECT created_at INTO v_created_at FROM reputation_logs WHERE id = NEW.reputation_log_id;
+  IF v_created_at IS NULL THEN
+    RAISE EXCEPTION 'Không tìm thấy đánh giá tương ứng để khiếu nại.';
+  END IF;
+  
+  IF v_created_at < now() - INTERVAL '72 hours' THEN
+    RAISE EXCEPTION 'Đã quá hạn 72 giờ để gửi khiếu nại đối với đánh giá này.';
+  END IF;
+
+  -- Check user limits (3 appeals/user/month)
+  SELECT COUNT(*) INTO v_appeal_count
+  FROM appeals
+  WHERE user_id = NEW.user_id
+    AND created_at >= date_trunc('month', now());
+    
+  IF v_appeal_count >= 3 THEN
+    RAISE EXCEPTION 'Bạn đã vượt quá số lượt khiếu nại tối đa trong tháng này (Tối đa 3 lượt).';
+  END IF;
+
+  -- Default status when submitted
+  NEW.status := 'Disputed_Frozen';
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_check_appeal_constraints ON appeals;
+CREATE TRIGGER trg_check_appeal_constraints
+  BEFORE INSERT ON appeals
+  FOR EACH ROW EXECUTE FUNCTION check_appeal_constraints();
+
+-- 9. Cron Job / Time-locked task runner (SLA 72h locks)
+-- Runs periodically to close expired appeals and hide one-way reviews
+CREATE OR REPLACE FUNCTION finalize_expired_appeals_and_reviews()
+RETURNS void AS $$
+BEGIN
+  -- Finalize pending/disputed appeals older than 72 hours
+  UPDATE appeals 
+  SET status = 'Finalized', 
+      admin_comment = COALESCE(admin_comment, 'Tự động đóng do quá thời hạn khiếu nại 72 giờ')
+  WHERE status IN ('Pending', 'Disputed_Frozen') 
+    AND created_at < now() - INTERVAL '72 hours';
+
+  -- Finalize reputation logs. If one-way review has been sitting for > 72 hours,
+  -- it will stay is_visible_to_public = false forever. No action needed other than keeping it false.
+  -- But we run recalculation on users whose appeals were finalized to apply the rating penalty
+  -- (since they transition from Disputed_Frozen to Finalized, the reputation recalculates)
+  -- The trg_recalc_reputation_appeal trigger will automatically run on those updates.
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 10. Message notification trigger
 CREATE OR REPLACE FUNCTION public.notify_new_message()
 RETURNS trigger AS $$
 DECLARE
   v_recipient_id UUID;
   v_sender_name TEXT;
 BEGIN
-  -- Find recipient (the other participant in the conversation)
   SELECT CASE 
     WHEN j.owner_id = NEW.sender_id THEN c.worker_id
     ELSE j.owner_id
@@ -308,7 +511,6 @@ BEGIN
   JOIN jobs j ON j.id = c.job_id
   WHERE c.id = NEW.conversation_id;
 
-  -- Get sender name
   SELECT COALESCE(name, split_part(email, '@', 1)) INTO v_sender_name
   FROM users
   WHERE id = NEW.sender_id;
@@ -330,5 +532,110 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP TRIGGER IF EXISTS message_notification ON messages;
 CREATE TRIGGER message_notification
   AFTER INSERT ON messages
-  FOR EACH ROW
-  EXECUTE FUNCTION public.notify_new_message();
+  FOR EACH ROW EXECUTE FUNCTION public.notify_new_message();
+
+-- =======================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =======================================================
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reputation_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appeals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- users policies
+CREATE POLICY "Allow public read users" ON users FOR SELECT USING (true);
+CREATE POLICY "Users can insert own profile" ON users FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- jobs policies
+CREATE POLICY "Allow public read jobs" ON jobs FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated insert jobs" ON jobs FOR INSERT TO authenticated WITH CHECK (auth.uid() = owner_id);
+CREATE POLICY "Allow update own jobs" ON jobs FOR UPDATE USING (auth.uid() = owner_id OR assigned_worker_id = auth.uid() OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+CREATE POLICY "Allow delete own jobs" ON jobs FOR DELETE USING (auth.uid() = owner_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- job_applications policies
+CREATE POLICY "Allow read all applications" ON job_applications FOR SELECT USING (true);
+CREATE POLICY "Allow insert own applications" ON job_applications FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Allow delete own applications" ON job_applications FOR DELETE USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- contracts policies
+CREATE POLICY "Allow read contracts" ON contracts FOR SELECT USING (true);
+CREATE POLICY "Allow insert own contracts" ON contracts FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM jobs WHERE id = job_id AND owner_id = auth.uid()) OR
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Allow update own contracts" ON contracts FOR UPDATE USING (
+  worker_id = auth.uid() OR 
+  EXISTS (SELECT 1 FROM jobs WHERE id = job_id AND owner_id = auth.uid()) OR
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- credit_logs policies
+CREATE POLICY "Users can view own credit logs" ON credit_logs FOR SELECT USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- reputation_logs policies
+CREATE POLICY "Users can view public or related reputation logs" ON reputation_logs FOR SELECT USING (
+  is_visible_to_public = true OR 
+  auth.uid() = rater_id OR 
+  auth.uid() = rated_user_id OR 
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Users can insert own reputation logs" ON reputation_logs FOR INSERT TO authenticated WITH CHECK (auth.uid() = rater_id);
+
+-- appeals policies
+CREATE POLICY "Users can view own appeals or admin" ON appeals FOR SELECT USING (
+  auth.uid() = user_id OR 
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Users can insert own appeals" ON appeals FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Admin can update appeals" ON appeals FOR UPDATE USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'));
+
+-- conversations policies
+CREATE POLICY "Allow select conversations for participants" ON conversations FOR SELECT USING (
+  EXISTS (SELECT 1 FROM jobs j WHERE j.id = conversations.job_id AND j.owner_id = auth.uid()) OR 
+  worker_id = auth.uid() OR
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Allow insert conversations for participants" ON conversations FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM jobs j WHERE j.id = conversations.job_id AND j.owner_id = auth.uid()) OR 
+  worker_id = auth.uid()
+);
+
+-- messages policies
+CREATE POLICY "Participants can read messages" ON messages FOR SELECT USING (
+  sender_id = auth.uid() OR 
+  EXISTS (
+    SELECT 1 FROM conversations c
+    JOIN jobs j ON j.id = c.job_id
+    WHERE c.id = messages.conversation_id
+      AND (j.owner_id = auth.uid() OR c.worker_id = auth.uid())
+  ) OR
+  EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Participants can insert messages" ON messages FOR INSERT WITH CHECK (
+  sender_id = auth.uid() AND 
+  EXISTS (
+    SELECT 1 FROM conversations c
+    JOIN jobs j ON j.id = c.job_id
+    WHERE c.id = messages.conversation_id
+      AND (j.owner_id = auth.uid() OR c.worker_id = auth.uid())
+  )
+);
+CREATE POLICY "Participants can update messages seen status" ON messages FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM conversations c
+    JOIN jobs j ON j.id = c.job_id
+    WHERE c.id = messages.conversation_id
+      AND (j.owner_id = auth.uid() OR c.worker_id = auth.uid())
+  )
+);
+
+-- notifications policies
+CREATE POLICY "Allow select own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Allow update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);

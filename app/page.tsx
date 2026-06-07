@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import CreateJobForm from '@/components/CreateJobForm';
 import JobCard, { Job, Application, Contract } from '@/components/JobCard';
 import ReviewModal from '@/components/ReviewModal';
+import AppealModal from '@/components/AppealModal';
 import ChatDrawer from '@/components/ChatDrawer';
 
 interface ToastState {
@@ -27,10 +28,11 @@ const CATEGORIES = [
 export default function Dashboard() {
   const { profile, loading: authLoading, refreshProfile } = useAuth();
   
-  // Dashboard states
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [reputationLogs, setReputationLogs] = useState<any[]>([]);
+  const [userAppeals, setUserAppeals] = useState<any[]>([]);
   const [loadingFeed, setLoadingFeed] = useState<boolean>(true);
   
   // View context & Filters
@@ -44,6 +46,11 @@ export default function Dashboard() {
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
+
+  // Appeal Modal State
+  const [appealModalOpen, setAppealModalOpen] = useState(false);
+  const [appealReputationLogId, setAppealReputationLogId] = useState('');
+  const [appealJobTitle, setAppealJobTitle] = useState('');
 
   // Chat Drawer State
   const [chatOpen, setChatOpen] = useState(false);
@@ -161,28 +168,44 @@ export default function Dashboard() {
       // Fetch all jobs, joining on owner information
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select('*, owner:owner_id(email, name, is_verified)')
+        .select('*, owner:owner_id(email, name, is_verified, client_reputation, freelancer_reputation, reputation)')
         .order('created_at', { ascending: false });
 
       if (jobsError) throw jobsError;
 
       // Fetch all applications, joining on applicant details
       const { data: appsData, error: appsError } = await supabase
-        .from('applications')
-        .select('*, user:user_id(email, name, reputation, university)');
+        .from('job_applications')
+        .select('*, user:user_id(email, name, reputation, freelancer_reputation, university)');
 
       if (appsError) throw appsError;
 
       // Fetch active contracts, joining on contractor details
       const { data: contractsData, error: contractsError } = await supabase
         .from('contracts')
-        .select('*, worker:worker_id(email, name)');
+        .select('*, worker:worker_id(email, name, freelancer_reputation, reputation)');
 
       if (contractsError) throw contractsError;
+
+      // Fetch reputation logs
+      const { data: repLogsData, error: repLogsError } = await supabase
+        .from('reputation_logs')
+        .select('*');
+
+      if (repLogsError) throw repLogsError;
+
+      // Fetch appeals
+      const { data: appealsData, error: appealsError } = await supabase
+        .from('appeals')
+        .select('*');
+
+      if (appealsError) throw appealsError;
 
       setJobs(jobsData as Job[] || []);
       setApplications(appsData as Application[] || []);
       setContracts(contractsData as Contract[] || []);
+      setReputationLogs(repLogsData || []);
+      setUserAppeals(appealsData || []);
     } catch (err: any) {
       console.error('Failed to load marketplace feeds:', err);
       triggerToast(err.message || 'Lỗi kết nối cơ sở dữ liệu Supabase.', 'error');
@@ -213,7 +236,7 @@ export default function Dashboard() {
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'applications' },
+        { event: 'INSERT', schema: 'public', table: 'job_applications' },
         (payload) => {
           loadJobsAndRelations();
           // Notify if active user owns the job
@@ -238,11 +261,23 @@ export default function Dashboard() {
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ratings' },
+        { event: '*', schema: 'public', table: 'reputation_logs' },
         (payload) => {
-          if (payload.new.rated_user_id === profile.id) {
-            triggerToast(`⭐ Bạn nhận được đánh giá ${payload.new.stars} sao cho công việc hoàn thành!`, 'success');
+          loadJobsAndRelations();
+          refreshProfile();
+          if (payload.eventType === 'INSERT') {
+            if (payload.new.rated_user_id === profile.id) {
+              triggerToast(`⭐ Bạn nhận được một đánh giá mới!`, 'success');
+            }
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appeals' },
+        () => {
+          loadJobsAndRelations();
+          refreshProfile();
         }
       )
       .subscribe();
@@ -255,8 +290,13 @@ export default function Dashboard() {
   // Handler: Apply to a job listing (Freelancer Action)
   const handleApplyToJob = async (jobId: string) => {
     try {
+      // Check if freelancer has at least 30 credits to stake
+      if (profile!.credits < 30) {
+        throw new Error('Số dư không đủ! Bạn cần có ít nhất 30 credits để đặt cọc khi nhận việc.');
+      }
+
       const { error } = await supabase
-        .from('applications')
+        .from('job_applications')
         .insert([{ job_id: jobId, user_id: profile!.id }]);
 
       if (error) throw error;
@@ -272,26 +312,56 @@ export default function Dashboard() {
   // Handler: Hires a candidate (Employer Action)
   const handleAcceptApplicant = async (jobId: string, workerId: string) => {
     try {
-      // 1. Update Job state to in_progress
+      // 1. Update Job state to in_progress and assign the worker
       const { error: jobError } = await supabase
         .from('jobs')
-        .update({ status: 'in_progress' })
+        .update({ 
+          status: 'in_progress', 
+          assigned_worker_id: workerId 
+        })
         .eq('id', jobId);
 
       if (jobError) throw jobError;
 
-      // 2. Insert new Contract
+      // 2. Insert new Contract (For backward compatibility / tracking)
       const { error: contractError } = await supabase
         .from('contracts')
         .insert([{ job_id: jobId, worker_id: workerId, status: 'active' }]);
 
       if (contractError) throw contractError;
 
-      triggerToast('Đã chọn ứng viên thành công! Dự án bắt đầu thực hiện.', 'success');
+      triggerToast('Đã nhận sinh viên và khóa cọc 30 credits thành công! Dự án bắt đầu.', 'success');
       loadJobsAndRelations();
+      refreshProfile();
     } catch (err: any) {
       console.error(err);
-      triggerToast(err.message || 'Lỗi ký hợp đồng.', 'error');
+      triggerToast(err.message || 'Lỗi chọn ứng viên.', 'error');
+    }
+  };
+
+  // Handler: Approve Completion from either Client or Worker
+  const handleApproveCompletion = async (jobId: string, role: 'client' | 'worker') => {
+    try {
+      const updateData: any = {};
+      if (role === 'client') {
+        updateData.client_approved = true;
+      } else {
+        updateData.worker_approved = true;
+      }
+
+      const { error } = await supabase
+        .from('jobs')
+        .update(updateData)
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      triggerToast('Đã xác nhận hoàn thành công việc của bạn!', 'success');
+      loadJobsAndRelations();
+      refreshProfile();
+    } catch (err: any) {
+      console.error('Lỗi khi xác nhận hoàn thành:', err);
+      triggerToast(err.message || 'Lỗi khi xác nhận.', 'error');
     }
   };
 
@@ -302,79 +372,69 @@ export default function Dashboard() {
     setReviewModalOpen(true);
   };
 
-  // Handler: Settle job and pay credits to worker after rating submission (Employer Action)
+  // Handler: Submit blind review rating & comment to reputation_logs (Either client or worker)
   const handleSubmitReview = async (
     jobId: string,
-    workerId: string,
+    ratedUserId: string,
     stars: number,
+    comment: string,
     proofUrl: string | null
   ) => {
-    const targetJob = jobs.find((j) => j.id === jobId);
-    if (!targetJob) throw new Error('Không tìm thấy tin tuyển dụng.');
+    try {
+      const { error: ratingError } = await supabase
+        .from('reputation_logs')
+        .insert([
+          {
+            job_id: jobId,
+            rater_id: profile!.id,
+            rated_user_id: ratedUserId,
+            stars,
+            comment,
+            proof_image_url: proofUrl,
+          },
+        ]);
 
-    // 1. Insert rating records
-    const { error: ratingError } = await supabase
-      .from('ratings')
-      .insert([
-        {
-          job_id: jobId,
-          rater_id: profile!.id,
-          rated_user_id: workerId,
-          stars,
-          proof_image_url: proofUrl,
-        },
-      ]);
+      if (ratingError) throw ratingError;
 
-    if (ratingError) throw ratingError;
+      triggerToast('Đã gửi đánh giá ẩn thành công! Đánh giá sẽ hiển thị khi đối tác hoàn thành hoặc sau 72h.', 'success');
+      loadJobsAndRelations();
+      refreshProfile();
+    } catch (err: any) {
+      console.error('Error submitting review:', err);
+      triggerToast(err.message || 'Lỗi gửi đánh giá.', 'error');
+      throw err;
+    }
+  };
 
-    // 2. Update Job status to completed
-    const { error: jobError } = await supabase
-      .from('jobs')
-      .update({ status: 'completed' })
-      .eq('id', jobId);
+  // Handler: Submit appeal for low rating (SLA 72h)
+  const handleSubmitAppeal = async (
+    reputationLogId: string,
+    reason: string,
+    proofUrl: string
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('appeals')
+        .insert([
+          {
+            user_id: profile!.id,
+            reputation_log_id: reputationLogId,
+            reason,
+            proof_image_url: proofUrl,
+            status: 'Disputed_Frozen', // Trigger check_appeal_constraints sets this too
+          },
+        ]);
 
-    if (jobError) throw jobError;
+      if (error) throw error;
 
-    // 3. Update Contract status to completed
-    const { error: contractError } = await supabase
-      .from('contracts')
-      .update({ status: 'completed' })
-      .eq('job_id', jobId);
-
-    if (contractError) throw contractError;
-
-    // 4. Fetch worker details to check current balance
-    const { data: workerData, error: workerFetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', workerId)
-      .single();
-
-    if (workerFetchError) throw workerFetchError;
-
-    // 5. Advanced Reputation Scoring Logic
-    let reputationDelta = 0;
-    if (stars >= 4) reputationDelta = 5;
-    else if (stars <= 2) reputationDelta = -5;
-
-    const updatedCredits = workerData.credits + targetJob.price;
-    const updatedReputation = Math.max(0, workerData.reputation + reputationDelta);
-
-    const { error: payoutError } = await supabase
-      .from('users')
-      .update({
-        credits: updatedCredits,
-        reputation: updatedReputation,
-      })
-      .eq('id', workerId);
-
-    if (payoutError) throw payoutError;
-
-    triggerToast(`Nghiệm thu thành công! Giải ngân ${targetJob.price.toLocaleString('vi-VN')}₫ và đánh giá ${stars} sao cho sinh viên.`, 'success');
-    
-    // Refresh states
-    refreshProfile();
-    loadJobsAndRelations();
+      triggerToast('Nộp khiếu nại thành công! Đóng băng điểm phạt để Admin duyệt.', 'success');
+      loadJobsAndRelations();
+      refreshProfile();
+    } catch (err: any) {
+      console.error('Lỗi khi nộp khiếu nại:', err);
+      triggerToast(err.message || 'Không thể gửi khiếu nại.', 'error');
+      throw err;
+    }
   };
 
   if (authLoading || !profile) {
@@ -425,9 +485,18 @@ export default function Dashboard() {
       <ReviewModal
         isOpen={reviewModalOpen}
         jobId={selectedJobId}
-        workerId={selectedWorkerId}
+        ratedUserId={selectedWorkerId}
         onClose={() => setReviewModalOpen(false)}
         onSubmitReview={handleSubmitReview}
+      />
+
+      {/* Appeal Modal */}
+      <AppealModal
+        isOpen={appealModalOpen}
+        reputationLogId={appealReputationLogId}
+        jobTitle={appealJobTitle}
+        onClose={() => setAppealModalOpen(false)}
+        onSubmitAppeal={handleSubmitAppeal}
       />
 
       {/* 4. Title Header Block */}
@@ -527,6 +596,20 @@ export default function Dashboard() {
                         onAcceptApplicant={handleAcceptApplicant}
                         onCompleteClick={handleCompleteClick}
                         onOpenChat={handleOpenChat}
+                        onApproveCompletion={handleApproveCompletion}
+                        onOpenAppealModal={(ratingId, jobTitle) => {
+                          setAppealReputationLogId(ratingId);
+                          setAppealJobTitle(jobTitle);
+                          setAppealModalOpen(true);
+                        }}
+                        onOpenReviewModal={(jobId, ratedUserId, jobTitle) => {
+                          setSelectedJobId(jobId);
+                          setSelectedWorkerId(ratedUserId);
+                          setAppealJobTitle(jobTitle);
+                          setReviewModalOpen(true);
+                        }}
+                        jobReviews={reputationLogs}
+                        userAppeals={userAppeals}
                       />
                     ))}
                   </div>
@@ -594,6 +677,20 @@ export default function Dashboard() {
                       onAcceptApplicant={handleAcceptApplicant}
                       onCompleteClick={handleCompleteClick}
                       onOpenChat={handleOpenChat}
+                      onApproveCompletion={handleApproveCompletion}
+                      onOpenAppealModal={(ratingId, jobTitle) => {
+                        setAppealReputationLogId(ratingId);
+                        setAppealJobTitle(jobTitle);
+                        setAppealModalOpen(true);
+                      }}
+                      onOpenReviewModal={(jobId, ratedUserId, jobTitle) => {
+                        setSelectedJobId(jobId);
+                        setSelectedWorkerId(ratedUserId);
+                        setAppealJobTitle(jobTitle);
+                        setReviewModalOpen(true);
+                      }}
+                      jobReviews={reputationLogs}
+                      userAppeals={userAppeals}
                     />
                   ))}
                 </div>

@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [jobs, setJobs] = useState<AdminJob[]>([]);
   const [ratings, setRatings] = useState<AdminRating[]>([]);
+  const [appeals, setAppeals] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   
   // Navigation tabs: approvals | users | ai_moderation | disputes
@@ -83,16 +84,24 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false });
       if (jobsErr) throw jobsErr;
 
-      // Load all ratings
+      // Load all ratings (reputation logs)
       const { data: ratingsData, error: ratingsErr } = await supabase
-        .from('ratings')
+        .from('reputation_logs')
         .select('*')
         .order('created_at', { ascending: false });
       if (ratingsErr) throw ratingsErr;
 
+      // Load all appeals with joined data
+      const { data: appealsData, error: appealsErr } = await supabase
+        .from('appeals')
+        .select('*, user:user_id(name, email), reputation_log:reputation_log_id(*, rater:rater_id(name, email), job:job_id(title, price))')
+        .order('created_at', { ascending: false });
+      if (appealsErr) throw appealsErr;
+
       setUsers((usersData as AdminUser[]) || []);
       setJobs((jobsData as AdminJob[]) || []);
       setRatings((ratingsData as AdminRating[]) || []);
+      setAppeals(appealsData || []);
     } catch (err: any) {
       console.error('[Admin Load Error] Details:', JSON.stringify(err, null, 2));
       setErrorMessage(err.message || 'Lỗi khi đồng bộ dữ liệu quản trị viên.');
@@ -270,6 +279,51 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleApproveAppeal = async (appealId: string, reputationLogId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn duyệt khiếu nại này? Đánh giá phạt sẽ bị xóa vĩnh viễn.')) return;
+    setActionLoading(`approve-appeal-${appealId}`);
+    try {
+      // Deleting the reputation log will cascade and delete the appeal as well.
+      const { error } = await supabase
+        .from('reputation_logs')
+        .delete()
+        .eq('id', reputationLogId);
+
+      if (error) throw error;
+      setSuccess('Đã duyệt khiếu nại thành công! Điểm phạt đã được xóa.');
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[Admin Appeal Error] Approve failed:', err);
+      setError(err.message || 'Lỗi phê duyệt khiếu nại.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectAppeal = async (appealId: string, customComment?: string) => {
+    const comment = customComment || 'Invalid_Artifact_URL';
+    if (!confirm(`Bạn có chắc chắn muốn bác bỏ khiếu nại này với lý do: "${comment}"?`)) return;
+    setActionLoading(`reject-appeal-${appealId}`);
+    try {
+      const { error } = await supabase
+        .from('appeals')
+        .update({
+          status: 'Finalized',
+          admin_comment: comment
+        })
+        .eq('id', appealId);
+
+      if (error) throw error;
+      setSuccess(`Đã bác bỏ khiếu nại! Áp dụng điểm phạt thành công.`);
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[Admin Appeal Error] Reject failed:', err);
+      setError(err.message || 'Lỗi bác bỏ khiếu nại.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Helper Maps for UI lookups
   const userMap = new Map(users.map(u => [u.id, u]));
   const jobMap = new Map(jobs.map(j => [j.id, j]));
@@ -355,12 +409,12 @@ export default function AdminDashboard() {
           </div>
 
           <div className="rounded-2xl border border-border-color bg-card-bg p-5 shadow-card">
-            <span className="text-[10px] font-black uppercase text-text-muted tracking-wider">Tranh chấp Đơn hàng</span>
+            <span className="text-[10px] font-black uppercase text-text-muted tracking-wider">Tranh chấp & Khiếu nại</span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className={`text-2xl font-black ${disputes.length > 0 ? 'text-indigo-600' : 'text-foreground'}`}>
-                {disputes.length}
+              <span className={`text-2xl font-black ${appeals.length > 0 ? 'text-indigo-650' : 'text-foreground'}`}>
+                {appeals.length}
               </span>
-              <span className="text-[10px] text-text-muted">vụ việc</span>
+              <span className="text-[10px] text-text-muted">yêu cầu</span>
             </div>
           </div>
         </div>
@@ -408,7 +462,7 @@ export default function AdminDashboard() {
                 : 'text-text-muted hover:text-foreground border border-transparent hover:bg-slate-100 dark:hover:bg-slate-900'
             }`}
           >
-            ⚖️ Phân quyết Tranh chấp ({disputes.length})
+            ⚖️ Khiếu nại điểm phạt ({appeals.length})
           </button>
         </div>
 
@@ -735,73 +789,128 @@ export default function AdminDashboard() {
             )}
 
             {/* ========================================== */}
-            {/* TAB: DISPUTES / LOW RATINGS                */}
+            {/* TAB: DISPUTES / LOW RATINGS APPEALS        */}
             {/* ========================================== */}
             {activeTab === 'disputes' && (
               <div className="space-y-6">
-                {disputes.length === 0 ? (
+                {appeals.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border-color bg-card-bg/20 py-16 text-center max-w-md mx-auto">
                     <span className="text-3xl block mb-3">🛡️</span>
-                    <h3 className="text-base font-bold mb-1 text-foreground">Không có tranh chấp cần giải quyết</h3>
+                    <h3 className="text-base font-bold mb-1 text-foreground">Không có khiếu nại nào</h3>
                     <p className="text-xs text-text-muted">
-                      Hệ thống ghi nhận tỷ lệ hài lòng cao, không có đơn hàng nào bị đánh giá từ 1 đến 2 sao kèm khiếu nại.
+                      Hệ thống ghi nhận không có khiếu nại điểm phạt uy tín nào đang chờ xử lý.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {disputes.map((rat) => {
-                      const rater = userMap.get(rat.rater_id);
-                      const worker = userMap.get(rat.rated_user_id);
-                      const job = jobMap.get(rat.job_id);
+                  <div className="grid grid-cols-1 gap-6">
+                    {appeals.map((app) => {
+                      const repLog = app.reputation_log;
+                      const rater = repLog?.rater;
+                      const job = repLog?.job;
+                      const isPending = app.status === 'Disputed_Frozen';
+
                       return (
-                        <div key={rat.id} className="rounded-2xl border border-border-color bg-card-bg p-6 shadow-card flex flex-col justify-between border-l-4 border-l-amber-500">
-                          <div>
-                            <div className="flex justify-between items-start gap-4 mb-2">
+                        <div key={app.id} className="rounded-2xl border border-border-color bg-card-bg p-6 shadow-card flex flex-col md:flex-row gap-6 border-l-4 border-l-indigo-500">
+                          {/* Left: Appeal details & Proof */}
+                          <div className="flex-1 space-y-4">
+                            <div className="flex justify-between items-start gap-4">
                               <div>
-                                <h4 className="text-base font-bold text-foreground">Công việc: {job?.title || 'Công việc đã xóa'}</h4>
-                                <span className="text-[10px] text-text-muted block">Ngân sách dự án: {job ? `${job.price.toLocaleString('vi-VN')}₫` : '0đ'}</span>
+                                <h4 className="text-base font-bold text-foreground">
+                                  Người khiếu nại: {app.user?.name || 'Sinh Viên'}
+                                </h4>
+                                <span className="text-[10px] text-text-muted block">{app.user?.email}</span>
                               </div>
-                              <span className="rounded-full bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 text-xs font-extrabold text-rose-500">
-                                ⭐ {rat.stars} sao
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
+                                isPending ? 'bg-amber-500/10 border border-amber-500/20 text-amber-600' : 'bg-purple-500/10 border border-purple-500/20 text-purple-600'
+                              }`}>
+                                {isPending ? '⚖️ Đang đóng băng' : '✓ Đã giải quyết'}
                               </span>
                             </div>
 
-                            <div className="h-px bg-border-color my-3" />
-
-                            <div className="text-xs text-text-muted space-y-2 mb-4 text-left">
-                              <p>👤 **Nhà tuyển dụng (Người khiếu nại):** <strong className="text-foreground">{rater?.name || 'Sinh viên'}</strong> ({rater?.email})</p>
-                              <p>🛠️ **Freelancer Sinh viên (Người bị khiếu nại):** <strong className="text-foreground">{worker?.name || 'Sinh viên'}</strong> ({worker?.email})</p>
-                              <p>🕒 **Thời gian đánh giá:** {new Date(rat.created_at).toLocaleDateString('vi-VN')}</p>
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-left">
+                              <span className="block text-[9px] font-black uppercase text-text-muted mb-1.5">Lý do khiếu nại (Appealing Reason):</span>
+                              <p className="text-foreground leading-relaxed font-medium">"{app.reason}"</p>
                             </div>
 
-                            {rat.proof_image_url ? (
-                              <div className="rounded-xl overflow-hidden border border-border-color bg-background p-2 mb-4">
-                                <span className="block text-[8px] font-black uppercase text-text-muted mb-1.5">Ảnh minh chứng tranh chấp / vi phạm (Proof of Dispute):</span>
-                                <a href={rat.proof_image_url} target="_blank" rel="noreferrer" className="block relative group">
+                            {app.proof_image_url && (
+                              <div className="rounded-xl overflow-hidden border border-border-color bg-background p-2">
+                                <span className="block text-[8px] font-black uppercase text-text-muted mb-1.5">Minh chứng của người khiếu nại (Appeal Attachment):</span>
+                                <a href={app.proof_image_url} target="_blank" rel="noreferrer" className="block relative group max-w-sm">
                                   <img
-                                    src={rat.proof_image_url}
-                                    alt="Minh chứng tranh chấp"
-                                    className="w-full h-44 object-cover rounded-lg bg-slate-900 border border-border-color group-hover:opacity-85 transition-opacity"
+                                    src={app.proof_image_url}
+                                    alt="Minh chứng khiếu nại"
+                                    className="w-full h-32 object-cover rounded-lg bg-slate-900 border border-border-color group-hover:opacity-85 transition-opacity"
                                   />
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold">
-                                    🔍 Xem ảnh gốc kích thước đầy đủ
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity text-white text-[9px] font-bold">
+                                    🔍 Xem ảnh minh chứng gốc
                                   </div>
                                 </a>
-                              </div>
-                            ) : (
-                              <div className="rounded-xl border border-dashed border-rose-500/20 py-4 text-center text-xs text-rose-500 bg-rose-500/5 mb-4">
-                                ⚠️ Cảnh báo: Người dùng không cung cấp ảnh chụp minh chứng vi phạm!
                               </div>
                             )}
                           </div>
 
-                          <div className="flex gap-2 border-t border-border-color pt-4">
-                            <button
-                              onClick={() => alert('Giải quyết tranh chấp: Hệ thống đã ghi nhận kiểm duyệt của quản trị viên và sẽ giữ nguyên hoặc khôi phục uy tín sau khi thương lượng.')}
-                              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer active:scale-98 shadow-md"
-                            >
-                              ✓ Xác nhận & Đóng khiếu nại
-                            </button>
+                          {/* Right: Bad Rating details & Admin Action */}
+                          <div className="w-full md:w-80 flex flex-col justify-between border-t md:border-t-0 md:border-l border-border-color pt-6 md:pt-0 md:pl-6">
+                            <div>
+                              <span className="block text-[10px] font-black uppercase text-text-muted tracking-wider mb-2">Đánh giá bị khiếu nại</span>
+                              
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-left mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-bold text-rose-500">⭐ {repLog?.stars} sao phạt</span>
+                                  <span className="text-[10px] text-text-muted">Job: {job?.title || 'Đã xóa'}</span>
+                                </div>
+                                <p className="text-text-muted mb-2">👤 Rater: <strong className="text-foreground">{rater?.name || 'Đối tác'}</strong> ({rater?.email})</p>
+                                {repLog?.comment && (
+                                  <p className="italic text-slate-500 font-medium">Nhận xét: "{repLog.comment}"</p>
+                                )}
+                                {repLog?.proof_image_url && (
+                                  <a href={repLog.proof_image_url} target="_blank" rel="noreferrer" className="text-indigo-600 font-semibold hover:underline block mt-1.5 text-[10px]">
+                                    🖼️ Xem ảnh minh chứng rater tải lên
+                                  </a>
+                                )}
+                              </div>
+
+                              {app.admin_comment && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs text-left mb-4">
+                                  <span className="block text-[9px] font-black uppercase text-indigo-600 mb-0.5">Kết luận của Admin:</span>
+                                  <p className="text-indigo-900 font-medium italic">"{app.admin_comment}"</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {isPending && (
+                              <div className="space-y-2">
+                                <button
+                                  onClick={() => handleApproveAppeal(app.id, app.reputation_log_id)}
+                                  disabled={actionLoading !== null}
+                                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs shadow-md cursor-pointer transition-all active:scale-98"
+                                >
+                                  {actionLoading === `approve-appeal-${app.id}` ? 'Đang xử lý...' : '✓ Duyệt (Xóa điểm phạt)'}
+                                </button>
+                                
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  <button
+                                    onClick={() => handleRejectAppeal(app.id, 'Invalid_Artifact_URL')}
+                                    disabled={actionLoading !== null}
+                                    className="py-2.5 rounded-xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-50 text-rose-600 font-bold text-[10px] cursor-pointer transition-all active:scale-98"
+                                  >
+                                    ✕ Bác bỏ (Lý do: Invalid URL)
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const comment = prompt('Nhập lý do bác bỏ khiếu nại:');
+                                      if (comment && comment.trim()) {
+                                        handleRejectAppeal(app.id, comment.trim());
+                                      }
+                                    }}
+                                    disabled={actionLoading !== null}
+                                    className="py-2.5 rounded-xl border border-slate-350 hover:bg-slate-100 disabled:opacity-50 text-foreground font-bold text-[10px] cursor-pointer transition-all active:scale-98"
+                                  >
+                                    ✕ Bác bỏ (Lý do khác...)
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

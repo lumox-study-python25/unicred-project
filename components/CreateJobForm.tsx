@@ -64,8 +64,8 @@ export default function CreateJobForm({
     }
 
     // Credits check
-    if (userCredits < numericPrice) {
-      return setErrorMsg(`Số dư không đủ! Bạn cần ${numericPrice.toLocaleString('vi-VN')}₫, nhưng hiện tại chỉ có ${userCredits.toLocaleString('vi-VN')}₫.`);
+    if (userCredits < 30) {
+      return setErrorMsg('Số dư không đủ! Bạn cần có ít nhất 30 credits để đặt cọc khi đăng việc.');
     }
 
     if (!description.trim()) return setErrorMsg('Vui lòng nhập mô tả chi tiết công việc.');
@@ -92,16 +92,8 @@ export default function CreateJobForm({
     }
 
     try {
-      // 1. Deduct credits (VND) from user in database
-      const newCreditsBalance = userCredits - numericPrice;
-      const { error: deductError } = await supabase
-        .from('users')
-        .update({ credits: newCreditsBalance })
-        .eq('id', activeUserId);
-
-      if (deductError) throw deductError;
-
-      // 2. Insert new job record with AI moderation flags
+      // Insert new job record. The trigger handle_job_post_credits will automatically
+      // validate the owner has >= 30 credits, deduct it, and create credit_logs.
       const { data, error: insertError } = await supabase
         .from('jobs')
         .insert([
@@ -121,14 +113,10 @@ export default function CreateJobForm({
         .select()
         .single();
 
-      if (insertError) {
-        // Rollback credits on job insert failure
-        await supabase.from('users').update({ credits: userCredits }).eq('id', activeUserId);
-        throw insertError;
-      }
+      if (insertError) throw insertError;
 
       if (data) {
-        setSuccessMsg(`Đăng việc thành công! Hệ thống đã tạm giữ ${numericPrice.toLocaleString('vi-VN')}₫ ký quỹ.`);
+        setSuccessMsg(`Đăng việc thành công! Hệ thống đã tự động khấu trừ 30 credits cọc uy tín.`);
         
         // Reset form inputs (retaining default future date)
         setTitle('');
@@ -142,7 +130,7 @@ export default function CreateJobForm({
         setDeadline(defaultDate.toISOString().split('T')[0]);
 
         // Trigger updates in parent dashboard
-        onCreditsUpdated(newCreditsBalance);
+        onCreditsUpdated(userCredits - 30);
         onJobCreated(data as Job);
       }
     } catch (err: any) {
