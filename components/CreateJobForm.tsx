@@ -33,6 +33,7 @@ export default function CreateJobForm({
   const [category, setCategory] = useState('coding');
   const [location, setLocation] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [price, setPrice] = useState(''); // Biến lưu tiền công
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -57,12 +58,17 @@ export default function CreateJobForm({
     // Validations
     if (!title.trim()) return setErrorMsg('Vui lòng nhập tiêu đề công việc.');
     
-    // Credits check
+    // Credits check (Vẫn giữ điều kiện trừ 30 credits ngầm của hệ thống)
     if (userCredits < 30) {
       return setErrorMsg('Số dư không đủ! Bạn cần có ít nhất 30 credits để đăng tuyển công việc.');
     }
 
     if (!description.trim()) return setErrorMsg('Vui lòng nhập mô tả chi tiết công việc.');
+
+    // Price validation
+    if (!price || Number(price) <= 0) {
+      return setErrorMsg('Vui lòng nhập số tiền công hợp lệ (lớn hơn 0).');
+    }
 
     const selectedDeadline = new Date(deadline);
     if (isNaN(selectedDeadline.getTime()) || selectedDeadline < new Date()) {
@@ -86,8 +92,6 @@ export default function CreateJobForm({
     }
 
     try {
-      // Insert new job record. The trigger handle_job_post_credits will automatically
-      // validate the owner has >= 30 credits, deduct it, and create credit_logs.
       const { data, error: insertError } = await supabase
         .from('jobs')
         .insert([
@@ -99,6 +103,7 @@ export default function CreateJobForm({
             deadline: selectedDeadline.toISOString(),
             category,
             location: location.trim() || 'Online',
+            price: Number(price), // Lưu tiền công vào database
             is_flagged: isFlagged,
             flagged_reason: flaggedReason,
           },
@@ -111,11 +116,12 @@ export default function CreateJobForm({
       if (data) {
         setSuccessMsg(`Đăng việc thành công! Hệ thống đã tự động khấu trừ 30 credits.`);
         
-        // Reset form inputs (retaining default future date)
+        // Reset form inputs
         setTitle('');
         setDescription('');
         setLocation('');
         setCategory('coding');
+        setPrice(''); // Reset ô nhập tiền
         
         const defaultDate = new Date();
         defaultDate.setDate(defaultDate.getDate() + 7);
@@ -134,29 +140,29 @@ export default function CreateJobForm({
   };
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Đăng việc mới</h2>
-      <p className="text-xs text-gray-500 mb-6">
+    <div className="relative rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-black text-slate-800 mb-1">Đăng việc mới</h2>
+      <p className="text-xs text-slate-500 mb-6 leading-relaxed">
         Tìm sinh viên làm freelancer. Đăng việc tốn cố định 30 credits. Người nhận việc (Freelancer) hoàn thành sẽ nhận +10 credits.
       </p>
 
       {/* Info/Error Banners */}
       {errorMsg && (
-        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-500">
+        <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold text-rose-600 shadow-sm">
           ⚠️ {errorMsg}
         </div>
       )}
 
       {successMsg && (
-        <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-500">
+        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-600 shadow-sm">
           ✓ {successMsg}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <label htmlFor="title" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+          <label htmlFor="title" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Tiêu đề công việc
           </label>
           <input
@@ -166,13 +172,13 @@ export default function CreateJobForm({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={isSubmitting}
-            className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
+            className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl px-4 py-3 text-sm transition-all shadow-sm"
           />
         </div>
 
         {/* Category Selection */}
         <div>
-          <label htmlFor="category" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+          <label htmlFor="category" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Danh mục công việc
           </label>
           <select
@@ -180,7 +186,7 @@ export default function CreateJobForm({
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             disabled={isSubmitting}
-            className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm cursor-pointer"
+            className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl px-4 py-3 text-sm cursor-pointer transition-all shadow-sm"
           >
             {CATEGORIES.map((cat) => (
               <option key={cat.value} value={cat.value}>
@@ -190,21 +196,33 @@ export default function CreateJobForm({
           </select>
         </div>
 
-        {/* Info & Deadline Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Credits indicator */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-              Chi phí đăng việc
+        {/* Tiền công & Deadline Grid - ĐÃ SỬA CĂN CHỈNH PIXEL PERFECT */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          {/* Nhập tiền công */}
+          <div className="w-full">
+            <label htmlFor="price" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+              Tiền công (VNĐ)
             </label>
-            <div className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-4 py-3 text-sm font-semibold flex items-center">
-              🪙 30 Credits
+            <div className="relative">
+              <input
+                id="price"
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="Ví dụ: 150000"
+                disabled={isSubmitting}
+                className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl pl-4 pr-10 h-[46px] text-sm transition-all shadow-sm"
+                required
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                đ
+              </span>
             </div>
           </div>
 
           {/* Deadline */}
-          <div>
-            <label htmlFor="deadline" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+          <div className="w-full">
+            <label htmlFor="deadline" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
               Hạn chót công việc
             </label>
             <input
@@ -213,14 +231,14 @@ export default function CreateJobForm({
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
               disabled={isSubmitting}
-              className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
+              className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl px-4 h-[46px] text-sm transition-all shadow-sm"
             />
           </div>
         </div>
 
         {/* Location (optional) */}
         <div>
-          <label htmlFor="location" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+          <label htmlFor="location" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Địa điểm làm việc (Không bắt buộc)
           </label>
           <input
@@ -230,13 +248,13 @@ export default function CreateJobForm({
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             disabled={isSubmitting}
-            className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm"
+            className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl px-4 py-3 text-sm transition-all shadow-sm"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+          <label htmlFor="description" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
             Mô tả chi tiết công việc
           </label>
           <textarea
@@ -246,23 +264,23 @@ export default function CreateJobForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={isSubmitting}
-            className="w-full text-gray-900 bg-white border border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none rounded-xl px-4 py-3 text-sm resize-none"
+            className="w-full text-slate-900 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-xl px-4 py-3 text-sm resize-none transition-all shadow-sm"
           />
         </div>
 
-        {/* Submit */}
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full relative flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:from-blue-500 hover:to-purple-500 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 cursor-pointer"
+          className="w-full relative flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:hover:translate-y-0 transition-all duration-200 cursor-pointer mt-2"
         >
           {isSubmitting ? (
             <>
-              <div className="h-4 w-4 animate-spin rounded-full border border-t-transparent border-white" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white" />
               Đang đăng tuyển...
             </>
           ) : (
-            `Đăng việc làm (Chi phí: 30 credits)`
+            `Đăng việc làm (Tiền công: ${price ? Number(price).toLocaleString('vi-VN') : '0'}đ)`
           )}
         </button>
       </form>

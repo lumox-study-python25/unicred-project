@@ -120,69 +120,83 @@ export default function Navbar() {
   const userLevel = Math.max(1, Math.min(10, Math.floor(credits / 100)));
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         
         {/* Brand Logo Link to Dashboard */}
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/" className="group flex items-center gap-2">
           <div className="relative">
-            <div className="absolute -inset-1 rounded-lg bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-70 blur-md transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-xl font-black text-white shadow-xl">
+            <div className="absolute -inset-1 animate-pulse rounded-lg bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 opacity-70 blur-md transition duration-1000 group-hover:duration-200"></div>
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-xl font-black text-white shadow-xl">
               U
             </div>
           </div>
           <span className="ml-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 bg-clip-text text-2xl font-black tracking-wider text-transparent">
             UniCred
           </span>
-          <span className="hidden sm:inline-block rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-400">
+          <span className="hidden rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-500 sm:inline-block">
             Sinh Viên
           </span>
         </Link>
 
-        {/* Right Nav Options */}
-        <div className="flex items-center gap-4">
-          {/* Theme Toggle Button */}
+        {/* Right Nav Options - Căn giữa trục dọc và cách đều */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          
+          {/* Theme Toggle Button (Cố định 40x40px, ép tâm tuyệt đối) */}
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-750 hover:bg-gray-100 transition-colors shadow-sm cursor-pointer"
+            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200/60 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50"
             aria-label="Toggle Theme"
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            <span className="flex items-center justify-center leading-none text-base">
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </span>
           </button>
 
           {profile && (
             <>
-              {/* Trust Score & Level */}
-              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-50 px-3.5 py-1.5 shadow-[0_0_15px_rgba(245,158,11,0.04)]">
-                <span className="text-xs">⭐</span>
-                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Trust:</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-black text-amber-600">{profile.trust_score ?? 0}</span>
-                  <span className="rounded-full bg-amber-100 border border-amber-200 px-1.5 py-0.2 text-[8px] font-black text-amber-700">
+              {/* Trust Score & Level (Căn giữa tuyệt đối chữ và icon) */}
+              <div className="hidden sm:flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-amber-200/50 bg-amber-50/60 px-3.5 shadow-sm">
+                <span className="flex items-center justify-center text-sm leading-none">⭐</span>
+                <span className="flex items-center justify-center pt-[1px] text-[10px] font-bold uppercase tracking-wider text-amber-700/70 leading-none">
+                  Trust:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="flex items-center justify-center text-sm font-black text-amber-600 leading-none">
+                    {profile.trust_score ?? 0}
+                  </span>
+                  <span className="flex items-center justify-center rounded-full border border-amber-200 bg-amber-100 px-1.5 py-[3px] text-[9px] font-black text-amber-700 shadow-sm leading-none">
                     Cấp {userLevel}
                   </span>
                 </div>
               </div>
 
-              {/* Credits Balance */}
-              <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-50 px-3.5 py-1.5 shadow-[0_0_15px_rgba(16,185,129,0.04)]">
-                <span className="text-xs">🪙</span>
-                <span className="hidden md:inline text-[10px] text-gray-500 font-bold uppercase tracking-wider">Số dư:</span>
-                <span className="text-xs sm:text-sm font-black text-emerald-600 tracking-wide">
-                  {credits} credits
+              {/* Credits Balance (Căn giữa tuyệt đối chữ và icon) */}
+              <div className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200/50 bg-emerald-50/60 px-3.5 shadow-sm">
+                <span className="flex items-center justify-center text-sm leading-none">🪙</span>
+                <span className="hidden md:flex items-center justify-center pt-[1px] text-[10px] font-bold uppercase tracking-wider text-emerald-700/70 leading-none">
+                  Số dư:
                 </span>
+                <div className="flex items-center gap-1 leading-none">
+                  <span className="flex items-center justify-center text-sm font-black tracking-wide text-emerald-600 leading-none">
+                    {credits}
+                  </span>
+                  <span className="flex items-center justify-center pt-[1px] text-[10px] font-bold text-emerald-600 leading-none">
+                    credits
+                  </span>
+                </div>
               </div>
 
-              {/* Notification Bell Dropdown */}
+              {/* Notification Bell Dropdown (Cố định 40x40px) */}
               <div className="relative">
                 <button
                   onClick={() => setNotiDropdownOpen(!notiDropdownOpen)}
-                  className="relative p-2.5 rounded-xl border border-border-color bg-card-bg text-foreground hover:bg-border-color transition-colors shadow-sm cursor-pointer focus:outline-none"
+                  className="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200/60 bg-white text-slate-500 shadow-sm transition-all hover:bg-slate-50 focus:outline-none"
                   aria-label="Notifications"
                 >
-                  🔔
+                  <span className="flex items-center justify-center leading-none text-base">🔔</span>
                   {notifications.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[9px] text-white font-black animate-pulse shadow-md">
+                    <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 animate-pulse items-center justify-center rounded-full bg-rose-600 text-[9px] font-black text-white shadow-md">
                       {notifications.length}
                     </span>
                   )}
@@ -192,15 +206,15 @@ export default function Navbar() {
                 {notiDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setNotiDropdownOpen(false)} />
-                    <div className="absolute right-0 mt-2.5 w-72 z-20 rounded-2xl border border-border-color bg-white dark:bg-slate-900 p-2 shadow-2xl animate-fade-in max-h-96 overflow-y-auto">
-                      <div className="px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800">
+                    <div className="absolute right-0 top-12 z-20 max-h-96 w-72 animate-fade-in overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                      <div className="border-b border-slate-100 px-3.5 py-2.5 dark:border-slate-800">
                         <span className="block text-xs font-black text-slate-900 dark:text-slate-100">
                           Thông báo tin nhắn ({notifications.length})
                         </span>
                       </div>
                       
                       {notifications.length === 0 ? (
-                        <div className="py-8 px-4 text-center text-xs text-text-muted italic">
+                        <div className="px-4 py-8 text-center text-xs italic text-slate-400">
                           Không có thông báo mới nào
                         </div>
                       ) : (
@@ -211,12 +225,12 @@ export default function Navbar() {
                               setNotiDropdownOpen(false);
                               handleNotificationClick(noti);
                             }}
-                            className="w-full flex flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-xs text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mt-1 border border-transparent cursor-pointer"
+                            className="mt-1 flex w-full cursor-pointer flex-col items-start gap-1 rounded-xl border border-transparent px-3 py-2.5 text-left text-xs transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                           >
-                            <span className="font-bold text-slate-850 dark:text-slate-100 block truncate w-full">
+                            <span className="block w-full truncate font-bold text-slate-800 dark:text-slate-100">
                               📩 {noti.content}
                             </span>
-                            <span className="text-[9px] text-slate-400 font-bold block">
+                            <span className="block text-[9px] font-bold text-slate-400">
                               {new Date(noti.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </button>
@@ -227,30 +241,30 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* Profile Avatar Dropdown */}
+              {/* Profile Avatar Dropdown (Cố định 40x40px) */}
               <div className="relative">
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-1 border border-border-color rounded-xl p-1 bg-card-bg hover:bg-border-color transition-all cursor-pointer focus:outline-none"
+                  className="relative flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200/60 bg-white p-0.5 shadow-sm transition-all hover:bg-slate-50 focus:outline-none"
                 >
                   {profile.avatar_url ? (
                     <img
                       src={profile.avatar_url}
                       alt="Avatar"
-                      className="h-8 w-8 rounded-lg object-cover shadow-sm border border-slate-700/20"
+                      className="h-full w-full rounded-lg object-cover shadow-sm"
                     />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-black text-white">
+                    <div className="flex h-full w-full items-center justify-center rounded-lg bg-indigo-600 text-xs font-black text-white shadow-md shadow-indigo-500/20">
                       {profile.name ? profile.name.slice(0, 2).toUpperCase() : 'SV'}
                     </div>
                   )}
                   {/* Verified Student Badge */}
                   {profile.is_verified ? (
-                    <span className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-blue-600 border-2 border-slate-950 text-[8px] text-white font-bold" title="Sinh viên đã xác thực">
+                    <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-[9px] font-bold text-white shadow-sm" title="Sinh viên đã xác thực">
                       ✓
                     </span>
                   ) : (
-                    <span className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-slate-600 border-2 border-slate-950 text-[8px] text-white font-bold" title="Đang chờ xác thực">
+                    <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-slate-500 text-[9px] font-bold text-white shadow-sm" title="Đang chờ xác thực">
                       ?
                     </span>
                   )}
@@ -260,12 +274,12 @@ export default function Navbar() {
                 {dropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
-                    <div className="absolute right-0 mt-2.5 w-52 z-20 rounded-2xl border border-border-color bg-card-bg p-2 shadow-2xl animate-fade-in">
-                      <div className="px-3.5 py-2.5 border-b border-border-color">
-                        <span className="block text-xs font-black text-foreground truncate">
+                    <div className="absolute right-0 top-12 z-20 w-52 animate-fade-in rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                      <div className="border-b border-slate-100 px-3.5 py-2.5 dark:border-slate-800">
+                        <span className="block truncate text-xs font-black text-slate-800 dark:text-slate-100">
                           {profile.name || 'Sinh Viên'}
                         </span>
-                        <span className="block text-[10px] text-text-muted truncate">
+                        <span className="block truncate text-[10px] text-slate-500">
                           {profile.email}
                         </span>
                       </div>
@@ -273,7 +287,7 @@ export default function Navbar() {
                       <Link
                         href="/profile"
                         onClick={() => setDropdownOpen(false)}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-foreground hover:bg-border-color transition-colors mt-1"
+                        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         👤 Hồ sơ cá nhân
                       </Link>
@@ -282,7 +296,7 @@ export default function Navbar() {
                         <Link
                           href="/admin"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors mt-1"
+                          className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-indigo-600 transition-colors hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10"
                         >
                           🛡️ Quản trị Admin
                         </Link>
@@ -293,7 +307,7 @@ export default function Navbar() {
                           setDropdownOpen(false);
                           signOut();
                         }}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 transition-colors mt-1 text-left cursor-pointer"
+                        className="mt-1 flex w-full cursor-pointer items-center gap-2 text-left rounded-xl px-3 py-2 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-500/10"
                       >
                         🚪 Đăng xuất
                       </button>

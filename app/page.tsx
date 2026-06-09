@@ -500,7 +500,7 @@ export default function Dashboard() {
           </div>
 
           {/* Toggle View Mode: Hire vs Earn */}
-          <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 self-start md:self-center shadow-inner">
+          <div className="inline-flex rounded-2xl bg-slate-150/80 p-1.5 self-start md:self-center shadow-inner backdrop-blur-sm border border-slate-200/50">
             <button
               onClick={() => setActiveView('hire')}
               className={`rounded-lg px-4 py-2 text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${

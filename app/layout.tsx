@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
+import { Inter } from "next/font/google";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Cấu hình phông chữ Inter chuẩn quốc tế & tiếng Việt
+const inter = Inter({ 
+  subsets: ["latin", "vietnamese"],
+  display: "swap", 
 });
 
 export const metadata: Metadata = {
@@ -24,11 +20,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="vi"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-200">
+    <html lang="vi" className="h-full">
+      {/* Đã bọc phông chữ Inter vào toàn bộ body và giữ nguyên lớp nền xám */}
+      <body className={`${inter.className} min-h-full flex flex-col bg-[#F8FAFC] text-slate-900 antialiased transition-colors duration-200`}>
         <AuthProvider>
           {children}
         </AuthProvider>
